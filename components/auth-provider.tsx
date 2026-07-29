@@ -8,6 +8,7 @@ import {
   useRef,
   useState,
 } from 'react';
+import { Platform } from 'react-native';
 
 import {
   ApiSession,
@@ -126,6 +127,64 @@ type AuthContextValue = {
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
+const storageTimeoutMs = 1500;
+const volatileWebStorage = new Map<string, string>();
+
+function getBrowserStorage() {
+  if (typeof window === 'undefined') {
+    return null;
+  }
+
+  try {
+    const storage = window.localStorage;
+    const probeKey = '__payvaylt_probe__';
+
+    storage.setItem(probeKey, '1');
+    storage.removeItem(probeKey);
+    return storage;
+  } catch {
+    return null;
+  }
+}
+
+function withStorageTimeout<T>(task: Promise<T>, fallback: T) {
+  return Promise.race<T>([
+    task,
+    new Promise<T>((resolve) => {
+      setTimeout(() => resolve(fallback), storageTimeoutMs);
+    }),
+  ]);
+}
+
+async function readPersistedState() {
+  if (Platform.OS === 'web') {
+    const browserStorage = getBrowserStorage();
+
+    if (browserStorage) {
+      return browserStorage.getItem(payVayltStorageKey);
+    }
+
+    return volatileWebStorage.get(payVayltStorageKey) ?? null;
+  }
+
+  return withStorageTimeout(AsyncStorage.getItem(payVayltStorageKey), null);
+}
+
+async function writePersistedState(value: string) {
+  if (Platform.OS === 'web') {
+    const browserStorage = getBrowserStorage();
+
+    if (browserStorage) {
+      browserStorage.setItem(payVayltStorageKey, value);
+      return;
+    }
+
+    volatileWebStorage.set(payVayltStorageKey, value);
+    return;
+  }
+
+  await withStorageTimeout(AsyncStorage.setItem(payVayltStorageKey, value), undefined);
+}
 
 function createPlanSummary(plan: PersistedState['plans'][number]): PlanSummary {
   return {
@@ -380,7 +439,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
   useEffect(() => {
     async function loadState() {
       try {
-        const stored = await AsyncStorage.getItem(payVayltStorageKey);
+        const stored = await readPersistedState();
         let nextState = normalizePersistedState(stored ? (JSON.parse(stored) as Partial<PersistedState>) : null);
 
         if (nextState.session?.token) {
@@ -415,7 +474,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
     }
 
     stateRef.current = state;
-    AsyncStorage.setItem(payVayltStorageKey, JSON.stringify(state)).catch(() => {
+    writePersistedState(JSON.stringify(state)).catch(() => {
       setAuthMessage('PayVaylt could not save the latest workspace changes on this device.');
     });
   }, [state]);

@@ -34,6 +34,7 @@ yarn-error.*
 .env*.local
 backend/uploads/
 .env
+.payvaylt-runtime/
 
 # editor settings
 .vscode/
