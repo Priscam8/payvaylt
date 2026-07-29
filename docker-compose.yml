@@ -1,0 +1,36 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: payvaylt
+      POSTGRES_USER: payvaylt
+      POSTGRES_PASSWORD: payvaylt
+    ports:
+      - '5432:5432'
+    volumes:
+      - payvaylt-postgres:/var/lib/postgresql/data
+
+  backend:
+    build:
+      context: .
+    restart: unless-stopped
+    depends_on:
+      - postgres
+    environment:
+      PAYVAYLT_PORT: 4000
+      PAYVAYLT_DATABASE_URL: postgres://payvaylt:payvaylt@postgres:5432/payvaylt
+      PAYVAYLT_DATABASE_SSL: ''
+      PAYVAYLT_DOCUMENT_STORAGE: local
+      PAYVAYLT_UPLOADS_DIR: /app/backend/uploads
+      PAYVAYLT_ALLOW_DEV_CODES: 'true'
+      PAYVAYLT_OTP_PROVIDER: console
+      PAYVAYLT_PAYMENT_PROVIDER: mock
+    ports:
+      - '4000:4000'
+    volumes:
+      - payvaylt-uploads:/app/backend/uploads
+
+volumes:
+  payvaylt-postgres:
+  payvaylt-uploads:

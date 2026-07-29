@@ -1,0 +1,51 @@
+{
+  "expo": {
+    "name": "PayVaylt",
+    "slug": "payvaylt",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/payvaylt-app-icon.png",
+    "scheme": "payvaylt",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "za.co.payvaylt.app",
+      "buildNumber": "1"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#F7FBFF",
+        "foregroundImage": "./assets/images/payvaylt-adaptive-foreground.png",
+        "monochromeImage": "./assets/images/payvaylt-adaptive-monochrome.png"
+      },
+      "edgeToEdgeEnabled": true,
+      "predictiveBackGestureEnabled": false,
+      "package": "za.co.payvaylt.app",
+      "versionCode": 1
+    },
+    "web": {
+      "output": "static",
+      "favicon": "./assets/images/payvaylt-favicon.png"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/images/payvaylt-logo-transparent.png",
+          "imageWidth": 200,
+          "resizeMode": "contain",
+          "backgroundColor": "#F7FBFF",
+          "dark": {
+            "backgroundColor": "#091427"
+          }
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true,
+      "reactCompiler": true
+    }
+  }
+}
