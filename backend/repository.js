@@ -20,6 +20,11 @@ const {
 const { getDatabaseInfo, initializeDatabase, query, withTransaction } = require('./database');
 const { createPaymentSession: createProviderPaymentSession, confirmPaymentSession: confirmProviderPaymentSession } = require('./providers/payment-provider');
 const { sendOtpCode } = require('./providers/otp-provider');
+const {
+  getVendorAdapter,
+  listVendorDefinitions,
+  slugifyVendor,
+} = require('../packages/vendor-integrations');
 
 const uploadBackedDocumentTitles = publicCatalog.ficaDocuments
   .map((item) => item.title)
@@ -204,6 +209,81 @@ function mapPaymentSession(row) {
         kind: row.kind,
         status: row.status,
         checkoutUrl: row.checkout_url ?? undefined,
+        metadata: row.metadata ?? {},
+        createdAt: new Date(row.created_at).toISOString(),
+        updatedAt: new Date(row.updated_at).toISOString(),
+      }
+    : null;
+}
+
+function mapVendor(row) {
+  return row
+    ? {
+        id: row.id,
+        slug: row.slug,
+        name: row.name,
+        category: row.category,
+        integration: row.integration_type,
+        status: row.status,
+        capabilities: row.capabilities ?? {},
+        metadata: row.metadata ?? {},
+        createdAt: new Date(row.created_at).toISOString(),
+        updatedAt: new Date(row.updated_at).toISOString(),
+      }
+    : null;
+}
+
+function mapVendorCatalogItem(row) {
+  return row
+    ? {
+        id: row.id,
+        vendorId: row.vendor_id,
+        sku: row.sku,
+        name: row.name,
+        description: row.description ?? '',
+        price: numericToNumber(row.price),
+        currency: row.currency,
+        availabilityStatus: row.availability_status,
+        stockQuantity: row.stock_quantity,
+        metadata: row.metadata ?? {},
+        createdAt: new Date(row.created_at).toISOString(),
+        updatedAt: new Date(row.updated_at).toISOString(),
+      }
+    : null;
+}
+
+function mapVendorReservation(row) {
+  return row
+    ? {
+        id: row.id,
+        vendorId: row.vendor_id,
+        customerId: row.customer_id ?? undefined,
+        externalReference: row.external_reference ?? undefined,
+        cartId: row.cart_id,
+        itemName: row.item_name,
+        itemCount: row.item_count,
+        total: numericToNumber(row.total),
+        currency: row.currency,
+        status: row.status,
+        reservedUntil: row.reserved_until ? new Date(row.reserved_until).toISOString() : undefined,
+        releaseReference: row.release_reference ?? undefined,
+        metadata: row.metadata ?? {},
+        createdAt: new Date(row.created_at).toISOString(),
+        updatedAt: new Date(row.updated_at).toISOString(),
+      }
+    : null;
+}
+
+function mapVendorVoucherAccount(row) {
+  return row
+    ? {
+        id: row.id,
+        vendorId: row.vendor_id,
+        customerId: row.customer_id,
+        balance: numericToNumber(row.balance),
+        currency: row.currency,
+        status: row.status,
+        expiresAt: row.expires_at ?? undefined,
         metadata: row.metadata ?? {},
         createdAt: new Date(row.created_at).toISOString(),
         updatedAt: new Date(row.updated_at).toISOString(),
@@ -453,7 +533,119 @@ async function insertPaymentSession(paymentSession, client) {
   );
 }
 
-async function ensureSeedData() {
+async function insertVendor(vendor, client) {
+  await query(
+    `INSERT INTO vendors
+      (id, slug, name, category, integration_type, status, capabilities, metadata, created_at, updated_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8::jsonb, $9, $10)`,
+    [
+      vendor.id,
+      vendor.slug,
+      vendor.name,
+      vendor.category,
+      vendor.integration,
+      vendor.status,
+      JSON.stringify(vendor.capabilities ?? {}),
+      JSON.stringify(vendor.metadata ?? {}),
+      vendor.createdAt,
+      vendor.updatedAt,
+    ],
+    client
+  );
+}
+
+async function insertVendorCatalogItem(item, client) {
+  await query(
+    `INSERT INTO vendor_catalog_items
+      (id, vendor_id, sku, name, description, price, currency, availability_status, stock_quantity, metadata, created_at, updated_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10::jsonb, $11, $12)`,
+    [
+      item.id,
+      item.vendorId,
+      item.sku,
+      item.name,
+      item.description ?? null,
+      item.price,
+      item.currency,
+      item.availabilityStatus,
+      item.stockQuantity,
+      JSON.stringify(item.metadata ?? {}),
+      item.createdAt,
+      item.updatedAt,
+    ],
+    client
+  );
+}
+
+async function insertVendorReservation(reservation, client) {
+  await query(
+    `INSERT INTO vendor_reservations
+      (id, vendor_id, customer_id, external_reference, cart_id, item_name, item_count, total, currency, status, reserved_until, release_reference, metadata, created_at, updated_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13::jsonb, $14, $15)`,
+    [
+      reservation.id,
+      reservation.vendorId,
+      reservation.customerId ?? null,
+      reservation.externalReference ?? null,
+      reservation.cartId,
+      reservation.itemName,
+      reservation.itemCount,
+      reservation.total,
+      reservation.currency,
+      reservation.status,
+      reservation.reservedUntil ?? null,
+      reservation.releaseReference ?? null,
+      JSON.stringify(reservation.metadata ?? {}),
+      reservation.createdAt,
+      reservation.updatedAt,
+    ],
+    client
+  );
+}
+
+async function insertVendorVoucherAccount(voucherAccount, client) {
+  await query(
+    `INSERT INTO vendor_voucher_accounts
+      (id, vendor_id, customer_id, balance, currency, status, expires_at, metadata, created_at, updated_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9, $10)`,
+    [
+      voucherAccount.id,
+      voucherAccount.vendorId,
+      voucherAccount.customerId,
+      voucherAccount.balance,
+      voucherAccount.currency,
+      voucherAccount.status,
+      voucherAccount.expiresAt ?? null,
+      JSON.stringify(voucherAccount.metadata ?? {}),
+      voucherAccount.createdAt,
+      voucherAccount.updatedAt,
+    ],
+    client
+  );
+}
+
+async function insertIntegrationEvent(event, client) {
+  await query(
+    `INSERT INTO integration_events
+      (id, vendor_id, entity_type, entity_id, event_type, status, request_payload, response_payload, occurred_at, created_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8::jsonb, $9, $10)`,
+    [
+      event.id,
+      event.vendorId ?? null,
+      event.entityType,
+      event.entityId ?? null,
+      event.eventType,
+      event.status,
+      JSON.stringify(event.requestPayload ?? {}),
+      JSON.stringify(event.responsePayload ?? {}),
+      event.occurredAt,
+      event.createdAt,
+    ],
+    client
+  );
+}
+
+async function ensureBaseSeedData() {
   const existing = await fetchOne('SELECT COUNT(*)::int AS count FROM customers');
   if (existing?.count > 0) {
     return false;
@@ -486,14 +678,71 @@ async function ensureSeedData() {
   return true;
 }
 
+async function ensureVendorSeedData() {
+  const existing = await fetchOne('SELECT COUNT(*)::int AS count FROM vendors');
+  if (existing?.count > 0) {
+    return false;
+  }
+
+  const createdAt = new Date().toISOString();
+  const definitions = listVendorDefinitions();
+
+  await withTransaction(async (client) => {
+    for (const definition of definitions) {
+      const vendorId = createId('vendor');
+      const adapter = getVendorAdapter(definition.slug);
+
+      await insertVendor(
+        {
+          id: vendorId,
+          slug: definition.slug,
+          name: definition.name,
+          category: definition.category,
+          integration: definition.integration,
+          status: definition.status,
+          capabilities: definition.capabilities,
+          metadata: definition.metadata,
+          createdAt,
+          updatedAt: createdAt,
+        },
+        client
+      );
+
+      for (const item of adapter.createCatalogRecords()) {
+        await insertVendorCatalogItem(
+          {
+            id: createId('vendor-item'),
+            vendorId,
+            sku: item.sku,
+            name: item.name,
+            description: item.description,
+            price: item.price,
+            currency: item.currency || 'ZAR',
+            availabilityStatus: item.availabilityStatus || 'available',
+            stockQuantity: item.stockQuantity ?? 0,
+            metadata: item.metadata,
+            createdAt,
+            updatedAt: createdAt,
+          },
+          client
+        );
+      }
+    }
+  });
+
+  return true;
+}
+
 async function initializeRepository() {
   const database = await initializeDatabase();
-  await ensureSeedData();
+  await ensureBaseSeedData();
+  await ensureVendorSeedData();
   await purgeExpiredRecords();
   return database;
 }
 
 async function getPublicBootstrap() {
+  const vendors = await getVendors();
   const customer = await fetchOne(
     'SELECT email, mobile FROM customers ORDER BY created_at ASC LIMIT 1'
   );
@@ -504,8 +753,21 @@ async function getPublicBootstrap() {
   return {
     brand: publicCatalog.brand,
     ficaDocuments: publicCatalog.ficaDocuments,
-    vendors: publicCatalog.vendors,
-    journeyDemo: publicCatalog.journeyDemo,
+    vendors:
+      vendors.length > 0
+        ? vendors.map((vendor) => ({
+            slug: vendor.slug,
+            name: vendor.name,
+            category: vendor.category,
+            integration: vendor.integration,
+            status: vendor.status,
+            capabilities: vendor.capabilities,
+          }))
+        : publicCatalog.vendors,
+    journeyDemo: {
+      ...publicCatalog.journeyDemo,
+      vendorSlug: 'exact',
+    },
     demoAccounts: {
       customer: {
         email: customer?.email,
@@ -579,6 +841,57 @@ async function getMerchantByEmail(workEmail, client) {
     await fetchOne(
       'SELECT * FROM merchants WHERE work_email = $1 LIMIT 1',
       [normalizeEmail(workEmail)],
+      client
+    )
+  );
+}
+
+async function getVendors(client) {
+  return fetchMany('SELECT * FROM vendors ORDER BY name ASC', [], mapVendor, client);
+}
+
+async function getVendorBySlug(vendorSlug, client) {
+  return mapVendor(
+    await fetchOne('SELECT * FROM vendors WHERE slug = $1 LIMIT 1', [slugifyVendor(vendorSlug)], client)
+  );
+}
+
+async function getVendorBySlugOrName(vendorSlugOrName, client) {
+  const adapter = getVendorAdapter(vendorSlugOrName);
+  const slug = adapter?.definition.slug || slugifyVendor(vendorSlugOrName);
+  return getVendorBySlug(slug, client);
+}
+
+async function getVendorCatalogItems(vendorId, client) {
+  return fetchMany(
+    'SELECT * FROM vendor_catalog_items WHERE vendor_id = $1 ORDER BY name ASC',
+    [vendorId],
+    mapVendorCatalogItem,
+    client
+  );
+}
+
+async function getVendorReservationById(reservationId, client) {
+  return mapVendorReservation(
+    await fetchOne('SELECT * FROM vendor_reservations WHERE id = $1 LIMIT 1', [reservationId], client)
+  );
+}
+
+async function getVendorReservationByVendorAndCart(vendorId, cartId, client) {
+  return mapVendorReservation(
+    await fetchOne(
+      'SELECT * FROM vendor_reservations WHERE vendor_id = $1 AND cart_id = $2 LIMIT 1',
+      [vendorId, cartId],
+      client
+    )
+  );
+}
+
+async function getVendorVoucherAccount(vendorId, customerId, client) {
+  return mapVendorVoucherAccount(
+    await fetchOne(
+      'SELECT * FROM vendor_voucher_accounts WHERE vendor_id = $1 AND customer_id = $2 LIMIT 1',
+      [vendorId, customerId],
       client
     )
   );
@@ -1114,57 +1427,8 @@ async function completeHomeAffairsCheck(customerId) {
 }
 
 async function purchaseVoucher(customerId, payload) {
-  await withTransaction(async (client) => {
-    const customer = await getCustomerById(customerId, client);
-    if (!customer) {
-      throw createAppError(404, 'That customer profile could not be found.');
-    }
-
-    const existing = mapVoucher(
-      await fetchOne(
-        'SELECT * FROM vouchers WHERE customer_id = $1 AND merchant = $2 LIMIT 1',
-        [customerId, payload.merchant],
-        client
-      )
-    );
-
-    if (existing) {
-      await query(
-        'UPDATE vouchers SET balance = balance + $3, use_case = $4 WHERE customer_id = $1 AND merchant = $2',
-        [customerId, payload.merchant, payload.amount, payload.useCase],
-        client
-      );
-    } else {
-      await insertVoucher(
-        {
-          id: createId('voucher'),
-          customerId,
-          merchant: payload.merchant,
-          balance: payload.amount,
-          expiry: 'No expiry',
-          useCase: payload.useCase,
-          createdAt: new Date().toISOString(),
-        },
-        client
-      );
-    }
-
-    await insertNotice(
-      {
-        id: createId('notice'),
-        title: 'Voucher purchased',
-        description: `${payload.merchant} voucher balance increased by ${formatCurrency(payload.amount)}.`,
-        icon: 'redeem',
-        audience: 'customer',
-        customerId,
-        type: 'voucher',
-        createdAt: new Date().toISOString(),
-      },
-      client
-    );
-  });
-
-  return getCustomerDashboard(customerId);
+  const result = await syncVendorVoucherAccount(payload.merchant, customerId, payload);
+  return result.dashboard;
 }
 
 async function createPlan(customerId, payload) {
@@ -1552,6 +1816,50 @@ async function completeCheckout(payload, paymentSessionId) {
       );
     }
 
+    if (payload.vendorReservationId) {
+      const reservation = await getVendorReservationById(payload.vendorReservationId, client);
+      if (!reservation) {
+        throw createAppError(404, 'That vendor reservation could not be found.');
+      }
+
+      if (reservation.cartId !== payload.journey.cartId) {
+        throw createAppError(409, 'The vendor reservation does not match this cart.');
+      }
+
+      await query(
+        `UPDATE vendor_reservations
+         SET customer_id = COALESCE($2, customer_id),
+             status = 'release-ready',
+             release_reference = $3,
+             updated_at = $4
+         WHERE id = $1`,
+        [reservation.id, customerId, payload.releaseReference, createdAt],
+        client
+      );
+
+      await insertIntegrationEvent(
+        {
+          id: createId('integration-event'),
+          vendorId: reservation.vendorId,
+          entityType: 'vendor-reservation',
+          entityId: reservation.id,
+          eventType: 'release-ready',
+          status: 'processed',
+          requestPayload: {
+            cartId: payload.journey.cartId,
+            releaseReference: payload.releaseReference,
+          },
+          responsePayload: {
+            reservationId: reservation.id,
+            status: 'release-ready',
+          },
+          occurredAt: createdAt,
+          createdAt,
+        },
+        client
+      );
+    }
+
     await insertNotice(
       {
         id: createId('notice'),
@@ -1604,6 +1912,235 @@ async function completeCheckout(payload, paymentSessionId) {
   };
 }
 
+async function listVendorIntegrations() {
+  return getVendors();
+}
+
+async function getVendorCatalog(vendorSlug) {
+  const vendor = await getVendorBySlug(vendorSlug);
+  if (!vendor) {
+    throw createAppError(404, 'That vendor integration could not be found.');
+  }
+
+  const items = await getVendorCatalogItems(vendor.id);
+  return {
+    vendor,
+    items,
+  };
+}
+
+async function createVendorReservation(vendorSlug, payload) {
+  return withTransaction(async (client) => {
+    const vendor = await getVendorBySlugOrName(vendorSlug, client);
+    if (!vendor) {
+      throw createAppError(404, 'That vendor integration could not be found.');
+    }
+
+    const adapter = getVendorAdapter(vendor.slug);
+    if (!adapter) {
+      throw createAppError(501, 'That vendor integration is not configured yet.');
+    }
+
+    const existing = await getVendorReservationByVendorAndCart(vendor.id, payload.cartId, client);
+    if (existing) {
+      return {
+        vendor,
+        reservation: existing,
+      };
+    }
+
+    const providerReservation = await adapter.createReservation(payload);
+    const createdAt = new Date().toISOString();
+    const reservation = {
+      id: createId('vendor-reservation'),
+      vendorId: vendor.id,
+      customerId: payload.customerId ?? null,
+      externalReference: providerReservation.externalReference ?? null,
+      cartId: payload.cartId,
+      itemName: payload.itemName,
+      itemCount: payload.itemCount ?? 1,
+      total: payload.total,
+      currency: payload.currency || 'ZAR',
+      status: providerReservation.status || 'reserved',
+      reservedUntil: providerReservation.reservedUntil ?? null,
+      releaseReference: payload.releaseReference ?? null,
+      metadata: {
+        ...(payload.metadata || {}),
+        ...(providerReservation.metadata || {}),
+      },
+      createdAt,
+      updatedAt: createdAt,
+    };
+
+    await insertVendorReservation(reservation, client);
+    await insertIntegrationEvent(
+      {
+        id: createId('integration-event'),
+        vendorId: vendor.id,
+        entityType: 'vendor-reservation',
+        entityId: reservation.id,
+        eventType: 'reserve-cart',
+        status: 'processed',
+        requestPayload: payload,
+        responsePayload: {
+          externalReference: reservation.externalReference,
+          status: reservation.status,
+          reservedUntil: reservation.reservedUntil,
+        },
+        occurredAt: createdAt,
+        createdAt,
+      },
+      client
+    );
+
+    return {
+      vendor,
+      reservation: await getVendorReservationById(reservation.id, client),
+    };
+  });
+}
+
+async function syncVendorVoucherAccount(vendorSlugOrName, customerId, payload) {
+  await withTransaction(async (client) => {
+    const customer = await getCustomerById(customerId, client);
+    if (!customer) {
+      throw createAppError(404, 'That customer profile could not be found.');
+    }
+
+    const vendor = await getVendorBySlugOrName(vendorSlugOrName, client);
+    if (!vendor) {
+      throw createAppError(404, 'That vendor integration could not be found.');
+    }
+
+    const adapter = getVendorAdapter(vendor.slug);
+    if (!adapter) {
+      throw createAppError(501, 'That vendor integration is not configured yet.');
+    }
+
+    const existingAccount = await getVendorVoucherAccount(vendor.id, customerId, client);
+    const synced = await adapter.syncVoucherAccount({
+      amount: payload.amount,
+      currentBalance: existingAccount?.balance ?? 0,
+      useCase: payload.useCase,
+      customerId,
+    });
+    const updatedAt = new Date().toISOString();
+
+    if (existingAccount) {
+      await query(
+        `UPDATE vendor_voucher_accounts
+         SET balance = $3,
+             currency = $4,
+             status = $5,
+             expires_at = $6,
+             metadata = $7::jsonb,
+             updated_at = $8
+         WHERE id = $1 AND vendor_id = $2`,
+        [
+          existingAccount.id,
+          vendor.id,
+          synced.balance,
+          synced.currency || 'ZAR',
+          synced.status || 'active',
+          synced.expiresAt ?? null,
+          JSON.stringify(synced.metadata ?? {}),
+          updatedAt,
+        ],
+        client
+      );
+    } else {
+      await insertVendorVoucherAccount(
+        {
+          id: createId('vendor-voucher'),
+          vendorId: vendor.id,
+          customerId,
+          balance: synced.balance,
+          currency: synced.currency || 'ZAR',
+          status: synced.status || 'active',
+          expiresAt: synced.expiresAt ?? null,
+          metadata: synced.metadata,
+          createdAt: updatedAt,
+          updatedAt,
+        },
+        client
+      );
+    }
+
+    const existingVoucher = mapVoucher(
+      await fetchOne(
+        'SELECT * FROM vouchers WHERE customer_id = $1 AND merchant = $2 LIMIT 1',
+        [customerId, vendor.name],
+        client
+      )
+    );
+
+    if (existingVoucher) {
+      await query(
+        `UPDATE vouchers
+         SET balance = $3,
+             expiry = $4,
+             use_case = $5
+         WHERE customer_id = $1 AND merchant = $2`,
+        [customerId, vendor.name, synced.balance, synced.expiresAt ?? 'No expiry', payload.useCase],
+        client
+      );
+    } else {
+      await insertVoucher(
+        {
+          id: createId('voucher'),
+          customerId,
+          merchant: vendor.name,
+          balance: synced.balance,
+          expiry: synced.expiresAt ?? 'No expiry',
+          useCase: payload.useCase,
+          createdAt: updatedAt,
+        },
+        client
+      );
+    }
+
+    await insertNotice(
+      {
+        id: createId('notice'),
+        title: 'Voucher synced with vendor',
+        description: `${vendor.name} voucher balance is now ${formatCurrency(synced.balance)}.`,
+        icon: 'redeem',
+        audience: 'customer',
+        customerId,
+        type: 'voucher',
+        createdAt: updatedAt,
+      },
+      client
+    );
+
+    await insertIntegrationEvent(
+      {
+        id: createId('integration-event'),
+        vendorId: vendor.id,
+        entityType: 'vendor-voucher-account',
+        entityId: existingAccount?.id ?? null,
+        eventType: 'sync-voucher-balance',
+        status: 'processed',
+        requestPayload: payload,
+        responsePayload: {
+          balance: synced.balance,
+          currency: synced.currency || 'ZAR',
+          expiresAt: synced.expiresAt ?? 'No expiry',
+        },
+        occurredAt: updatedAt,
+        createdAt: updatedAt,
+      },
+      client
+    );
+  });
+
+  const vendor = await getVendorBySlugOrName(vendorSlugOrName);
+  return {
+    vendor,
+    dashboard: await getCustomerDashboard(customerId),
+  };
+}
+
 module.exports = {
   beginCustomerSignIn,
   completeVerificationQuestions,
@@ -1612,9 +2149,12 @@ module.exports = {
   createCheckoutPaymentSession,
   completeCheckout,
   completeHomeAffairsCheck,
+  createVendorReservation,
   createPlan,
   getCustomerDashboard,
   getCustomerDocumentDownload,
+  getVendorCatalog,
+  listVendorIntegrations,
   getMerchantWorkspace,
   getPublicBootstrap,
   getSessionByToken,
@@ -1626,6 +2166,7 @@ module.exports = {
   resetPassword,
   signInMerchant,
   signOut,
+  syncVendorVoucherAccount,
   uploadCustomerDocument,
   updateCustomerFicaDocuments,
   verifyCustomerOtp,

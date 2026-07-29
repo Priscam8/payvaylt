@@ -33,6 +33,7 @@ export const payvayltData = {
     },
   ],
   journeyDemo: {
+    vendorSlug: 'exact',
     merchant: 'Bash Commerce',
     store: 'Exact',
     cartId: 'PV-BASH-20481',
@@ -192,22 +193,32 @@ export const payvayltData = {
   ],
   vendors: [
     {
+      slug: 'bash-commerce',
       name: 'Bash Commerce',
       category: 'Fashion and lifestyle',
       integration: 'Checkout redirect API',
-      status: 'Ready for plugin integration',
+      status: 'Connected',
     },
     {
+      slug: 'russells',
       name: 'Russells',
       category: 'Furniture and appliances',
       integration: 'Reserved-cart feed',
-      status: 'Suitable for pilot vendor agreement',
+      status: 'Connected',
     },
     {
+      slug: 'pep-home',
       name: 'Pep Home',
       category: 'Home essentials',
       integration: 'Voucher and lay-by sync',
-      status: 'Suitable for low-income household pilot',
+      status: 'Connected',
+    },
+    {
+      slug: 'exact',
+      name: 'Exact',
+      category: 'Schoolwear and family essentials',
+      integration: 'Voucher + release workflow',
+      status: 'Connected',
     },
   ],
   merchantFlow: [

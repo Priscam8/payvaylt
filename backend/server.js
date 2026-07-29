@@ -11,12 +11,15 @@ const {
   completeVerificationQuestions,
   confirmCheckoutPaymentSession,
   completeHomeAffairsCheck,
+  createVendorReservation,
   createAppError,
   createCheckoutPaymentSession,
   createPlan,
   getCustomerDashboard,
   getCustomerDocumentDownload,
   getDatabaseInfo,
+  getVendorCatalog,
+  listVendorIntegrations,
   getMerchantWorkspace,
   getPublicBootstrap,
   getSessionByToken,
@@ -28,6 +31,7 @@ const {
   resetPassword,
   signInMerchant,
   signOut,
+  syncVendorVoucherAccount,
   uploadCustomerDocument,
   updateCustomerFicaDocuments,
   verifyCustomerOtp,
@@ -190,6 +194,23 @@ const voucherPurchaseSchema = z.object({
   useCase: z.string().min(2),
 });
 
+const vendorReservationSchema = z.object({
+  cartId: z.string().min(3),
+  itemName: z.string().min(2),
+  itemCount: z.number().int().min(1).default(1),
+  total: z.number().positive(),
+  currency: z.string().min(3).default('ZAR'),
+  customerId: z.string().min(3).optional(),
+  customerIdentifier: z.string().min(5).optional(),
+  releaseReference: z.string().min(3).optional(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
+});
+
+const vendorVoucherSyncSchema = z.object({
+  amount: z.number().nonnegative(),
+  useCase: z.string().min(2),
+});
+
 const planCreateSchema = z.object({
   merchant: z.string().min(2),
   item: z.string().min(2),
@@ -254,6 +275,7 @@ const checkoutSchema = z.object({
   }),
   releaseReference: z.string().min(5),
   paymentSessionId: z.string().min(4).optional(),
+  vendorReservationId: z.string().min(4).optional(),
 });
 
 function parseCustomerMutation(documents, res) {
@@ -333,7 +355,7 @@ app.get(
     res.json({
       ok: true,
       service: 'payvaylt-backend',
-      version: 2,
+      version: 3,
       databaseMode: info.mode,
       databaseTarget: info.target,
       documentStorage: documentStorageInfo.mode,
@@ -349,6 +371,31 @@ app.get(
   '/api/catalog/bootstrap',
   asyncRoute(async (_req, res) => {
     res.json(await getPublicBootstrap());
+  })
+);
+
+app.get(
+  '/api/vendors',
+  asyncRoute(async (_req, res) => {
+    res.json({
+      vendors: await listVendorIntegrations(),
+    });
+  })
+);
+
+app.get(
+  '/api/vendors/:vendorSlug/catalog',
+  asyncRoute(async (req, res) => {
+    res.json(await getVendorCatalog(req.params.vendorSlug));
+  })
+);
+
+app.post(
+  '/api/vendors/:vendorSlug/reservations',
+  asyncRoute(async (req, res) => {
+    const payload = parseBody(vendorReservationSchema, req, res);
+    if (!payload) return;
+    res.status(201).json(await createVendorReservation(req.params.vendorSlug, payload));
   })
 );
 
@@ -439,6 +486,18 @@ app.post(
       await signOut(req.payvayltSession.token);
     }
     res.status(204).send();
+  })
+);
+
+app.post(
+  '/api/vendors/:vendorSlug/vouchers/sync',
+  requireSession('customer'),
+  asyncRoute(async (req, res) => {
+    const payload = parseBody(vendorVoucherSyncSchema, req, res);
+    if (!payload) return;
+    res.json(
+      await syncVendorVoucherAccount(req.params.vendorSlug, req.payvayltSession.accountId, payload)
+    );
   })
 );
 

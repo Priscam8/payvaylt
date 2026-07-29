@@ -1,4 +1,6 @@
+import Constants from 'expo-constants';
 import * as FileSystem from 'expo-file-system/legacy';
+import { Platform } from 'react-native';
 import type {
   Cadence,
   DocumentUpload,
@@ -85,6 +87,76 @@ export type PaymentSessionResponse = {
   updatedAt: string;
 };
 
+export type VendorIntegrationSummary = {
+  id?: string;
+  slug: string;
+  name: string;
+  category: string;
+  integration: string;
+  status: string;
+  capabilities?: Record<string, boolean>;
+  metadata?: Record<string, unknown>;
+};
+
+export type VendorCatalogItemResponse = {
+  id: string;
+  vendorId: string;
+  sku: string;
+  name: string;
+  description: string;
+  price: number;
+  currency: string;
+  availabilityStatus: string;
+  stockQuantity: number;
+  metadata: Record<string, unknown>;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type VendorReservationResponse = {
+  id: string;
+  vendorId: string;
+  customerId?: string;
+  externalReference?: string;
+  cartId: string;
+  itemName: string;
+  itemCount: number;
+  total: number;
+  currency: string;
+  status: string;
+  reservedUntil?: string;
+  releaseReference?: string;
+  metadata: Record<string, unknown>;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type VendorCatalogResponse = {
+  vendor: VendorIntegrationSummary;
+  items: VendorCatalogItemResponse[];
+};
+
+export type BootstrapResponse = {
+  brand: { headline: string; tagline: string; summary: string };
+  ficaDocuments: { title: string; detail: string }[];
+  vendors: VendorIntegrationSummary[];
+  journeyDemo: {
+    vendorSlug?: string;
+    merchant: string;
+    store: string;
+    cartId: string;
+    cartTotal: number;
+    itemCount: number;
+    leadItem: string;
+    recommendedDeposit: number;
+    suggestedVoucherUse: number;
+    maxTermMonths: number;
+    reservedUntil: string;
+    releaseLeadTime: string;
+  };
+  demoAccounts: Record<string, unknown>;
+};
+
 export type UploadableDocument = {
   uri: string;
   name: string;
@@ -121,13 +193,71 @@ function trimTrailingSlash(value: string) {
   return value.endsWith('/') ? value.slice(0, -1) : value;
 }
 
+function extractHost(value: string) {
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return '';
+  }
+
+  const normalized = trimmed.includes('://') ? trimmed : `http://${trimmed}`;
+
+  try {
+    return new URL(normalized).hostname;
+  } catch {
+    return '';
+  }
+}
+
+function getRuntimeHost() {
+  if (Platform.OS === 'web' && typeof window !== 'undefined' && window.location.hostname) {
+    return window.location.hostname;
+  }
+
+  const hostCandidates = [
+    Constants.expoConfig?.hostUri,
+    Constants.platform?.hostUri,
+  ];
+
+  for (const candidate of hostCandidates) {
+    const host = extractHost(String(candidate || ''));
+    if (host) {
+      return host;
+    }
+  }
+
+  if (Platform.OS === 'android') {
+    return '10.0.2.2';
+  }
+
+  return '127.0.0.1';
+}
+
+function normalizeConfiguredApiUrl(value: string) {
+  const trimmed = value.trim();
+  const runtimeHost = getRuntimeHost();
+
+  try {
+    const url = new URL(trimmed);
+    if (
+      Platform.OS !== 'web' &&
+      ['127.0.0.1', 'localhost', '0.0.0.0'].includes(url.hostname)
+    ) {
+      url.hostname = runtimeHost;
+    }
+
+    return trimTrailingSlash(url.toString());
+  } catch {
+    return trimTrailingSlash(trimmed);
+  }
+}
+
 export function getPayVayltApiBaseUrl() {
   const envBaseUrl = process.env.EXPO_PUBLIC_PAYVAYLT_API_URL;
   if (envBaseUrl && envBaseUrl.trim().length > 0) {
-    return trimTrailingSlash(envBaseUrl.trim());
+    return normalizeConfiguredApiUrl(envBaseUrl);
   }
 
-  return 'http://localhost:4000/api';
+  return `http://${getRuntimeHost()}:4000/api`;
 }
 
 async function request<T>(
@@ -184,13 +314,53 @@ export const payVayltApi = {
   },
 
   bootstrap() {
-    return request<{
-      brand: { headline: string; tagline: string; summary: string };
-      ficaDocuments: { title: string; detail: string }[];
-      vendors: { name: string; category: string; integration: string; status: string }[];
-      journeyDemo: Record<string, unknown>;
-      demoAccounts: Record<string, unknown>;
-    }>('/catalog/bootstrap');
+    return request<BootstrapResponse>('/catalog/bootstrap');
+  },
+
+  listVendors() {
+    return request<{ vendors: VendorIntegrationSummary[] }>('/vendors');
+  },
+
+  getVendorCatalog(vendorSlug: string) {
+    return request<VendorCatalogResponse>(`/vendors/${vendorSlug}/catalog`);
+  },
+
+  createVendorReservation(
+    vendorSlug: string,
+    payload: {
+      cartId: string;
+      itemName: string;
+      itemCount?: number;
+      total: number;
+      currency?: string;
+      customerId?: string;
+      customerIdentifier?: string;
+      releaseReference?: string;
+      metadata?: Record<string, unknown>;
+    }
+  ) {
+    return request<{ vendor: VendorIntegrationSummary; reservation: VendorReservationResponse }>(
+      `/vendors/${vendorSlug}/reservations`,
+      {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      }
+    );
+  },
+
+  syncVendorVoucher(
+    vendorSlug: string,
+    payload: { amount: number; useCase: string },
+    sessionToken: string
+  ) {
+    return request<{ vendor: VendorIntegrationSummary; dashboard: DashboardResponse }>(
+      `/vendors/${vendorSlug}/vouchers/sync`,
+      {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      },
+      sessionToken
+    );
   },
 
   registerCustomer(payload: {

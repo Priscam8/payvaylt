@@ -259,7 +259,7 @@
 					"-ObjC",
 					"-lc++",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = "com.anonymous.PayVayltApp";
+				PRODUCT_BUNDLE_IDENTIFIER = "za.co.payvaylt.app";
 				PRODUCT_NAME = "PayVayltApp";
 				SWIFT_OBJC_BRIDGING_HEADER = "PayVayltApp/PayVayltApp-Bridging-Header.h";
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
@@ -288,7 +288,7 @@
 					"-ObjC",
 					"-lc++",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = "com.anonymous.PayVayltApp";
+				PRODUCT_BUNDLE_IDENTIFIER = "za.co.payvaylt.app";
 				PRODUCT_NAME = "PayVayltApp";
 				SWIFT_OBJC_BRIDGING_HEADER = "PayVayltApp/PayVayltApp-Bridging-Header.h";
 				SWIFT_VERSION = 5.0;

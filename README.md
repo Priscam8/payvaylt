@@ -74,6 +74,34 @@ npm run backend
 npm run web
 ```
 
+## Use Postgres locally
+
+If you want a persistent local database instead of the in-memory demo database:
+
+```bash
+npm run backend:db:start
+npm run backend:db:migrate
+npm run backend
+```
+
+When you are done:
+
+```bash
+npm run backend:db:stop
+```
+
+The included [`docker-compose.yml`](./docker-compose.yml) starts a local Postgres 16 instance for PayVaylt.
+
+## Run on mobile
+
+The Expo app already supports iOS and Android. For a phone-friendly development session:
+
+```bash
+npm run mobile
+```
+
+If `EXPO_PUBLIC_PAYVAYLT_API_URL` is set to a localhost-style URL, the app now rewrites that host on native devices so Expo Go and simulators can still reach your backend during development.
+
 ## Run the backend separately
 
 Start the PayVaylt development API in a separate terminal:
@@ -121,6 +149,10 @@ This checks that Postgres, S3 document storage, Twilio OTP, Stripe payments, and
 
 - `GET /api/health`
 - `GET /api/catalog/bootstrap`
+- `GET /api/vendors`
+- `GET /api/vendors/:vendorSlug/catalog`
+- `POST /api/vendors/:vendorSlug/reservations`
+- `POST /api/vendors/:vendorSlug/vouchers/sync`
 - `POST /api/auth/customers/register`
 - `POST /api/auth/customers/sign-in`
 - `POST /api/auth/customers/verify-otp`
@@ -142,10 +174,12 @@ This checks that Postgres, S3 document storage, Twilio OTP, Stripe payments, and
 
 - SQL schema lives in [`backend/migrations/001_init.sql`](./backend/migrations/001_init.sql).
 - production-readiness additions for document uploads and payment sessions live in [`backend/migrations/002_customer_documents_and_payment_sessions.sql`](./backend/migrations/002_customer_documents_and_payment_sessions.sql).
+- vendor integration tables live in [`backend/migrations/003_vendor_integrations.sql`](./backend/migrations/003_vendor_integrations.sql).
 - If `PAYVAYLT_DATABASE_URL` is set, the backend uses your real Postgres database.
 - If `PAYVAYLT_DATABASE_URL` is not set, the backend uses an in-memory Postgres instance via `pg-mem` so local demo work still runs.
 - Expo can point to the backend with `EXPO_PUBLIC_PAYVAYLT_API_URL=http://localhost:4000/api`.
 - [`backend/repository.js`](./backend/repository.js) is the database-backed repository layer used by the API routes.
+- vendor adapter packages live in [`packages/vendor-integrations`](./packages/vendor-integrations).
 - customer document uploads are stored via [`backend/providers/document-storage.js`](./backend/providers/document-storage.js).
 - OTP delivery is abstracted in [`backend/providers/otp-provider.js`](./backend/providers/otp-provider.js).
 - payment-session creation and confirmation are abstracted in [`backend/providers/payment-provider.js`](./backend/providers/payment-provider.js).

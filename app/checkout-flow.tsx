@@ -1,6 +1,6 @@
 import * as WebBrowser from 'expo-web-browser';
 import { Link } from 'expo-router';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 
 import { useAuth } from '@/components/auth-provider';
@@ -9,7 +9,12 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { payvayltData } from '@/constants/payvaylt-data';
 import { useThemeColor } from '@/hooks/use-theme-color';
-import { payVayltApi, PaymentSessionResponse } from '@/lib/payvaylt-api';
+import {
+  BootstrapResponse,
+  payVayltApi,
+  PaymentSessionResponse,
+  VendorReservationResponse,
+} from '@/lib/payvaylt-api';
 
 type Cadence = 'Weekly' | 'Fortnightly' | 'Monthly';
 
@@ -22,7 +27,6 @@ function formatCurrency(amount: number) {
 
 export default function CheckoutFlowScreen() {
   const { completeCheckoutDemo } = useAuth();
-  const { journeyDemo } = payvayltData;
   const inputBackground = useThemeColor({ light: '#ffffff', dark: '#10203b' }, 'surface');
   const subtleBackground = useThemeColor({ light: '#f6f9fc', dark: '#16315a' }, 'surfaceMuted');
   const borderColor = useThemeColor({}, 'border');
@@ -44,8 +48,8 @@ export default function CheckoutFlowScreen() {
     homeAffairsMatched: false,
   });
   const [plan, setPlan] = useState({
-    deposit: String(journeyDemo.recommendedDeposit),
-    voucherAmount: String(journeyDemo.suggestedVoucherUse),
+    deposit: String(payvayltData.journeyDemo.recommendedDeposit),
+    voucherAmount: String(payvayltData.journeyDemo.suggestedVoucherUse),
     cadence: 'Monthly' as Cadence,
     term: '6',
   });
@@ -53,8 +57,33 @@ export default function CheckoutFlowScreen() {
   const [paymentComplete, setPaymentComplete] = useState(false);
   const [releaseTriggered, setReleaseTriggered] = useState(false);
   const [paymentSession, setPaymentSession] = useState<PaymentSessionResponse | null>(null);
+  const [bootstrapData, setBootstrapData] = useState<BootstrapResponse | null>(null);
+  const [vendorReservation, setVendorReservation] = useState<VendorReservationResponse | null>(null);
   const [paymentBusy, setPaymentBusy] = useState(false);
   const [paymentMessage, setPaymentMessage] = useState('');
+  const [reservationBusy, setReservationBusy] = useState(false);
+  const [reservationMessage, setReservationMessage] = useState('');
+
+  const journeyDemo = bootstrapData?.journeyDemo ?? payvayltData.journeyDemo;
+
+  useEffect(() => {
+    let active = true;
+
+    payVayltApi
+      .bootstrap()
+      .then((payload) => {
+        if (!active) {
+          return;
+        }
+
+        setBootstrapData(payload);
+      })
+      .catch(() => {});
+
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const deposit = Number(plan.deposit) || 0;
   const voucherAmount = Number(plan.voucherAmount) || 0;
@@ -114,8 +143,19 @@ export default function CheckoutFlowScreen() {
         releaseLeadTime: journeyDemo.releaseLeadTime,
       },
       releaseReference,
+      vendorReservationId: vendorReservation?.id,
     }),
-    [deposit, journeyDemo, plan.cadence, registration, releaseReference, termMonths, verification, voucherAmount]
+    [
+      deposit,
+      journeyDemo,
+      plan.cadence,
+      registration,
+      releaseReference,
+      termMonths,
+      verification,
+      vendorReservation?.id,
+      voucherAmount,
+    ]
   );
 
   function updateRegistration(field: keyof typeof registration, value: string) {
@@ -126,8 +166,47 @@ export default function CheckoutFlowScreen() {
     setVerification((current) => ({ ...current, [field]: !current[field] }));
   }
 
-  function continueToRegister() {
-    setStepIndex(1);
+  async function continueToRegister() {
+    if (vendorReservation?.id) {
+      setStepIndex(1);
+      return;
+    }
+
+    setReservationBusy(true);
+    setReservationMessage('');
+
+    try {
+      const reservationResult = await payVayltApi.createVendorReservation(
+        journeyDemo.vendorSlug || 'exact',
+        {
+          cartId: journeyDemo.cartId,
+          itemName: journeyDemo.leadItem,
+          itemCount: journeyDemo.itemCount,
+          total: journeyDemo.cartTotal,
+          currency: 'ZAR',
+          customerIdentifier: registration.email || registration.phone,
+          releaseReference,
+          metadata: {
+            merchant: journeyDemo.merchant,
+            store: journeyDemo.store,
+          },
+        }
+      );
+
+      setVendorReservation(reservationResult.reservation);
+      setReservationMessage(
+        `${reservationResult.vendor.name} reserved the cart with reference ${
+          reservationResult.reservation.externalReference || reservationResult.reservation.id
+        }.`
+      );
+      setStepIndex(1);
+    } catch (error) {
+      setReservationMessage(
+        error instanceof Error ? error.message : 'PayVaylt could not reserve the cart with the vendor.'
+      );
+    } finally {
+      setReservationBusy(false);
+    }
   }
 
   function submitRegistration() {
@@ -241,7 +320,20 @@ export default function CheckoutFlowScreen() {
                 {formatCurrency(journeyDemo.cartTotal)}
               </ThemedText>
             </ThemedView>
-            <ActionButton label="Continue to registration" onPress={continueToRegister} />
+            <ThemedView lightColor="#f8fbfe" darkColor="#16315a" style={styles.innerCard}>
+              <ThemedText type="cardTitle">Vendor reservation</ThemedText>
+              <ThemedText style={styles.supportText}>
+                {vendorReservation
+                  ? `${journeyDemo.store} marked this cart as ${vendorReservation.status}.`
+                  : 'PayVaylt will create a vendor reservation before the customer registration continues.'}
+              </ThemedText>
+              {reservationMessage ? <ThemedText style={styles.supportText}>{reservationMessage}</ThemedText> : null}
+            </ThemedView>
+            <ActionButton
+              label={reservationBusy ? 'Reserving cart...' : 'Continue to registration'}
+              onPress={continueToRegister}
+              disabled={reservationBusy}
+            />
           </View>
         )}
 
@@ -451,6 +543,15 @@ export default function CheckoutFlowScreen() {
               </ThemedText>
               {paymentMessage ? <ThemedText style={styles.supportText}>{paymentMessage}</ThemedText> : null}
             </ThemedView>
+            {vendorReservation ? (
+              <ThemedView lightColor="#f8fbfe" darkColor="#16315a" style={styles.innerCard}>
+                <ThemedText type="cardTitle">Vendor reservation status</ThemedText>
+                <ThemedText style={styles.supportText}>
+                  Reservation {vendorReservation.externalReference || vendorReservation.id} is currently{' '}
+                  {vendorReservation.status}.
+                </ThemedText>
+              </ThemedView>
+            ) : null}
             <ActionButton
               label={
                 paymentBusy
@@ -479,6 +580,15 @@ export default function CheckoutFlowScreen() {
                 {releaseTriggered ? 'triggered' : 'not triggered'}
               </ThemedText>
             </ThemedView>
+            {vendorReservation ? (
+              <ThemedView lightColor="#f8fbfe" darkColor="#16315a" style={styles.innerCard}>
+                <ThemedText type="cardTitle">Vendor handoff</ThemedText>
+                <ThemedText style={styles.supportText}>
+                  Reservation {vendorReservation.externalReference || vendorReservation.id} is linked to the
+                  release flow for {journeyDemo.store}.
+                </ThemedText>
+              </ThemedView>
+            ) : null}
             <View style={styles.summaryGrid}>
               <SummaryItem label="Customer" value={registration.fullName} />
               <SummaryItem label="Store" value={journeyDemo.store} />

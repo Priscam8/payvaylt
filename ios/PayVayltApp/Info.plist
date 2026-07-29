@@ -7,7 +7,7 @@
     <key>CFBundleDevelopmentRegion</key>
     <string>$(DEVELOPMENT_LANGUAGE)</string>
     <key>CFBundleDisplayName</key>
-    <string>PayVayltApp</string>
+    <string>PayVaylt</string>
     <key>CFBundleExecutable</key>
     <string>$(EXECUTABLE_NAME)</string>
     <key>CFBundleIdentifier</key>
@@ -27,14 +27,14 @@
       <dict>
         <key>CFBundleURLSchemes</key>
         <array>
-          <string>payvayltapp</string>
-          <string>com.anonymous.PayVayltApp</string>
+          <string>payvaylt</string>
+          <string>za.co.payvaylt.app</string>
         </array>
       </dict>
       <dict>
         <key>CFBundleURLSchemes</key>
         <array>
-          <string>exp+payvayltapp</string>
+          <string>exp+payvaylt</string>
         </array>
       </dict>
     </array>

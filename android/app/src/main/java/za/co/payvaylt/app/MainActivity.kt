@@ -1,4 +1,4 @@
-package com.anonymous.PayVayltApp
+package za.co.payvaylt.app
 import expo.modules.splashscreen.SplashScreenManager
 
 import android.os.Build
