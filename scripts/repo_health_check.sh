@@ -11,6 +11,17 @@ required_files=(
   ".github/workflows/ci.yml"
 )
 
+is_text_file() {
+  local mime_type
+  mime_type="$(file -b --mime-type "$1")"
+
+  [[ "${mime_type}" == text/* ]] \
+    || [[ "${mime_type}" == application/json ]] \
+    || [[ "${mime_type}" == application/xml ]] \
+    || [[ "${mime_type}" == application/x-sh ]] \
+    || [[ "${mime_type}" == application/javascript ]]
+}
+
 check_required_files() {
   local missing=0
 
@@ -37,6 +48,10 @@ check_line_endings() {
   local failed=0
 
   while IFS= read -r -d '' file; do
+    if ! is_text_file "${file}"; then
+      continue
+    fi
+
     if grep -q $'\r' "${file}"; then
       echo "Windows line endings detected in ${file}"
       failed=1
