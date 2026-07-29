@@ -48,8 +48,8 @@ export default function CheckoutFlowScreen() {
     homeAffairsMatched: false,
   });
   const [plan, setPlan] = useState({
-    deposit: String(journeyDemo.recommendedDeposit),
-    voucherAmount: String(journeyDemo.suggestedVoucherUse),
+    deposit: String(payvayltData.journeyDemo.recommendedDeposit),
+    voucherAmount: String(payvayltData.journeyDemo.suggestedVoucherUse),
     cadence: 'Monthly' as Cadence,
     term: '6',
   });
