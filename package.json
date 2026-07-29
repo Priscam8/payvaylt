@@ -8,6 +8,8 @@
     "android": "expo run:android",
     "ios": "expo run:ios",
     "web": "expo start --web",
+    "app:open": "node ./scripts/open-payvaylt.mjs",
+    "app:stop": "node ./scripts/stop-payvaylt.mjs",
     "lint": "expo lint",
     "backend": "node backend/server.js",
     "backend:dev": "node --watch backend/server.js",

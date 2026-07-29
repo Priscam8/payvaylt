@@ -42,17 +42,41 @@ Brand copy and static product content live in [`constants/payvaylt-data.ts`](./c
 - PostgreSQL-compatible SQL backend
 - `pg-mem` in-memory Postgres fallback for local demo use
 
+## One-click open
+
+On macOS, double-click [Open PayVaylt.command](./Open%20PayVaylt.command).
+
+That launcher will:
+
+- create `.env` from `.env.example` if it does not exist yet
+- install dependencies on the first run
+- start the PayVaylt backend in demo mode with the in-memory database, console OTP, and mock payments
+- start the web app on `http://127.0.0.1:8081`
+- open the app in your browser automatically
+
+To stop the local app again, double-click [Stop PayVaylt.command](./Stop%20PayVaylt.command).
+
+If you prefer the terminal, the same flow is available with:
+
+```bash
+npm run app:open
+npm run app:stop
+```
+
+Runtime logs are written to `.payvaylt-runtime/backend.log` and `.payvaylt-runtime/web.log`.
+
 ## Run locally
 
 ```bash
 npm install
 cp .env.example .env
-npx expo start
+npm run backend
+npm run web
 ```
 
-## Run the backend
+## Run the backend separately
 
-Start the PayVaylt development API in a second terminal:
+Start the PayVaylt development API in a separate terminal:
 
 ```bash
 npm run backend
