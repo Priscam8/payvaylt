@@ -1,50 +1,58 @@
-# Welcome to your Expo app 👋
+# PayVaylt Scan-to-Pay POS MVP
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+This repository now presents an investor-facing Expo MVP for a WhatsApp-enabled scan-to-pay point of sale aimed at small and informal merchants.
 
-## Get started
+The product promise is simple:
 
-1. Install dependencies
+- the merchant builds the order
+- the platform generates one secure checkout QR
+- the customer reviews the order in WhatsApp
+- the bank or regulated PSP authenticates the payment
+- both sides receive verified confirmation and a digital receipt
 
-   ```bash
-   npm install
-   ```
+## What the app now covers
 
-2. Start the app
+- investor landing page for the scan-to-pay concept
+- `Overview` tab for the business case, core journey, and target sectors
+- `Modes` tab for delivery methods, service definitions, and MVP deliverables
+- `Checkout` tab with a live merchant basket, dynamic QR, WhatsApp review, and bank approval simulation
+- `Readiness` tab for platform boundaries, architecture, and launch stage gates
+- `Scan-to-Pay Demo` stack route for the full interactive walkthrough
+- `Investor Brief` modal describing what to build first, what to partner next, and what not to promise yet
 
-   ```bash
-   npx expo start
-   ```
+Current front-end product copy lives in `constants/scan-to-pay-data.ts`, and the main interactive flow lives in `components/scan-to-pay-demo.tsx`.
 
-In the output, you'll find options to open the app in a
+## Stack
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+- Expo
+- React Native
+- TypeScript
+- Expo Router
+- Express
+- Zod
+- JSON file persistence for the development API
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
+## Run locally
 
 ```bash
-npm run reset-project
+npm install
+npx expo start
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+## Optional backend
 
-## Learn more
+The repository still includes the earlier Express scaffold in `backend/`. It is useful as a future starting point for merchant, customer, and checkout services, but the current investor POS demo is front-end driven and does not yet depend on a live bank or WhatsApp integration.
 
-To learn more about developing your project with Expo, look at the following resources:
+If you want to run that scaffold locally:
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+```bash
+npm run backend
+```
 
-## Join the community
+For auto-reload while you work:
 
-Join our community of developers creating universal apps.
+```bash
+npm run backend:dev
+```
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+The backend serves on `http://localhost:4000` by default and exposes a versioned API under `http://localhost:4000/api`.
