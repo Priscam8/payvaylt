@@ -1,0 +1,230 @@
+{
+  "version": 1,
+  "generatedAt": "2026-04-20T10:52:44.195Z",
+  "publicCatalog": {
+    "brand": {
+      "headline": "Work towards the goal.",
+      "tagline": "Build value. Unlock ownership.",
+      "summary": "PayVaylt is a digital lay-by platform that lets customers secure items today and finish paying at their own pace, within a term they choose up to 12 months."
+    },
+    "ficaDocuments": [
+      {
+        "title": "South African ID or passport",
+        "detail": "Front and back of ID card or passport identity page."
+      },
+      {
+        "title": "Proof of address",
+        "detail": "Recent utility bill, bank statement, or municipal letter."
+      },
+      {
+        "title": "Selfie verification",
+        "detail": "Face match image used for identity confirmation and fraud checks."
+      },
+      {
+        "title": "Verification questions",
+        "detail": "Customer profile questions confirmed before full dashboard access."
+      }
+    ],
+    "vendors": [
+      {
+        "name": "Bash Commerce",
+        "category": "Fashion and lifestyle",
+        "integration": "Checkout redirect API",
+        "status": "Ready for plugin integration"
+      },
+      {
+        "name": "Russells",
+        "category": "Furniture and appliances",
+        "integration": "Reserved-cart feed",
+        "status": "Suitable for pilot vendor agreement"
+      },
+      {
+        "name": "Pep Home",
+        "category": "Home essentials",
+        "integration": "Voucher and lay-by sync",
+        "status": "Suitable for low-income household pilot"
+      },
+      {
+        "name": "Exact",
+        "category": "Schoolwear and family essentials",
+        "integration": "Voucher + release workflow",
+        "status": "Live in the interactive demo flow"
+      }
+    ],
+    "journeyDemo": {
+      "merchant": "Bash Commerce",
+      "store": "Exact",
+      "cartId": "PV-BASH-20481",
+      "cartTotal": 2850,
+      "itemCount": 2,
+      "leadItem": "School uniform bundle",
+      "recommendedDeposit": 450,
+      "suggestedVoucherUse": 300,
+      "maxTermMonths": 12,
+      "reservedUntil": "14 May 2026",
+      "releaseLeadTime": "Same day after final payment confirmation"
+    }
+  },
+  "customers": [
+    {
+      "fullName": "Nandi Mokoena",
+      "email": "nandi@example.com",
+      "mobile": "0825550192",
+      "idNumber": "9801010123088",
+      "id": "customer-nandi",
+      "createdAt": "2026-04-17T08:00:00.000Z",
+      "verificationChecks": {
+        "accountCreated": true,
+        "otpVerified": true,
+        "questionsPassed": true,
+        "ficaUploaded": true,
+        "homeAffairsMatched": true
+      },
+      "ficaDocuments": {
+        "South African ID or passport": true,
+        "Proof of address": true,
+        "Selfie verification": true,
+        "Verification questions": true
+      },
+      "passwordHash": "scrypt:21bd8bf69cd9cabfa75875ade9239a80:f7160a15fc41b855a7b871b2a7e8f5c6fa861da26ba3156143229c273aca64df8b275e1ff084fe0cf4b66c7f7afb72bc23339e31a7a11f00a079b4427fe97cb3"
+    }
+  ],
+  "merchants": [
+    {
+      "companyName": "Exact Retail",
+      "workEmail": "merchant@exact.co.za",
+      "vendorNames": [
+        "Bash Commerce",
+        "Russells",
+        "Pep Home",
+        "Exact"
+      ],
+      "id": "merchant-exact",
+      "createdAt": "2026-04-17T08:00:00.000Z",
+      "passwordHash": "scrypt:7c605b2d02deecae68c16e16cceaa27c:4684bf03f68ad4de1feb16bf7602db8873051cb20ac235ae83de1b83255396938f22d9bfb8c57d7b61ab2907b6c76acac30ac0344141dd5e9f0eb913e93bead2"
+    }
+  ],
+  "plans": [
+    {
+      "id": "plan-1",
+      "customerId": "customer-nandi",
+      "merchant": "Russells",
+      "item": "Defy 8kg Front Loader Washing Machine",
+      "itemCount": 1,
+      "depositPaid": 1500,
+      "remaining": 4200,
+      "total": 5700,
+      "cadence": "Monthly",
+      "termMonths": 6,
+      "nextPayment": "25 Apr 2026",
+      "progress": 26,
+      "status": "On track",
+      "payoutMethod": "Voucher + card top-up",
+      "cartId": "CART-PLAN-1",
+      "createdAt": "2026-04-17T08:00:00.000Z"
+    },
+    {
+      "id": "plan-2",
+      "customerId": "customer-nandi",
+      "merchant": "Pep Home",
+      "item": "Queen Bed Base Set",
+      "itemCount": 1,
+      "depositPaid": 900,
+      "remaining": 2100,
+      "total": 3000,
+      "cadence": "Fortnightly",
+      "termMonths": 3,
+      "nextPayment": "18 Apr 2026",
+      "progress": 30,
+      "status": "Payment due",
+      "payoutMethod": "Direct EFT",
+      "cartId": "CART-PLAN-2",
+      "createdAt": "2026-04-17T08:00:00.000Z"
+    },
+    {
+      "id": "plan-3",
+      "customerId": "customer-nandi",
+      "merchant": "Exact",
+      "item": "School uniform bundle",
+      "itemCount": 1,
+      "depositPaid": 480,
+      "remaining": 720,
+      "total": 1200,
+      "cadence": "Monthly",
+      "termMonths": 4,
+      "nextPayment": "02 May 2026",
+      "progress": 40,
+      "status": "Merchant review",
+      "payoutMethod": "Store voucher",
+      "cartId": "CART-PLAN-3",
+      "createdAt": "2026-04-17T08:00:00.000Z"
+    }
+  ],
+  "vouchers": [
+    {
+      "id": "voucher-ibxupg-mo5vjagd",
+      "customerId": "customer-nandi",
+      "merchant": "Exact",
+      "balance": 850,
+      "expiry": "No expiry",
+      "useCase": "Schoolwear top-up or replacement item",
+      "createdAt": "2026-04-17T08:00:00.000Z"
+    },
+    {
+      "id": "voucher-yc6at2-mo5vjagd",
+      "customerId": "customer-nandi",
+      "merchant": "Pep Home",
+      "balance": 450,
+      "expiry": "No expiry",
+      "useCase": "Home essentials lay-by support",
+      "createdAt": "2026-04-17T08:00:00.000Z"
+    }
+  ],
+  "notices": [
+    {
+      "id": "notice-p95ti2-mo5vjagd",
+      "title": "Verification complete",
+      "description": "Home Affairs matching is complete. Your full PayVaylt customer workspace is unlocked.",
+      "icon": "verified-user",
+      "audience": "customer",
+      "customerId": "customer-nandi",
+      "type": "verification",
+      "createdAt": "2026-04-17T08:00:00.000Z"
+    },
+    {
+      "id": "notice-0mjq0f-mo5vjagd",
+      "title": "Voucher ready for future use",
+      "description": "Your Exact voucher balance remains available with no expiry date.",
+      "icon": "redeem",
+      "audience": "customer",
+      "customerId": "customer-nandi",
+      "type": "voucher",
+      "createdAt": "2026-04-17T08:00:00.000Z"
+    },
+    {
+      "id": "notice-30435r-mo5vjagd",
+      "title": "Release-ready queue",
+      "description": "Two Exact orders are ready for handoff once the final merchant release is confirmed.",
+      "icon": "local-shipping",
+      "audience": "merchant",
+      "merchantAccountId": "merchant-exact",
+      "type": "release",
+      "createdAt": "2026-04-17T08:00:00.000Z"
+    }
+  ],
+  "payments": [],
+  "sessions": [
+    {
+      "id": "session-6brbdn-mo72t1yb",
+      "token": "customer_ksr44du6i0mo72t1yb",
+      "role": "customer",
+      "accountId": "customer-nandi",
+      "displayName": "Nandi Mokoena",
+      "identifier": "nandi@example.com",
+      "createdAt": "2026-04-20T10:52:44.195Z",
+      "expiresAt": "2026-04-27T10:52:44.195Z"
+    }
+  ],
+  "otpChallenges": [],
+  "passwordResetChallenges": []
+}

@@ -13,9 +13,9 @@ Explain the problem, goal, or gap this pull request addresses.
 
 ## Validation
 
-- [ ] I tested the change in the most relevant way available
-- [ ] I updated docs if setup or behavior changed
-- [ ] I confirmed there are no unrelated changes in this pull request
+- [ ] I ran the most relevant local checks
+- [ ] I updated docs or environment examples if setup changed
+- [ ] I confirmed no secrets or local-only files are included
 
 ## Follow-ups
 

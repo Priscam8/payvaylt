@@ -1,24 +1,24 @@
-# Contributing to payvaylt
+# Contributing to PayVaylt
 
-Thanks for contributing.
+Thanks for contributing to PayVaylt.
 
 ## Pull request expectations
 
-1. Keep each pull request focused on one change.
+1. Keep each pull request focused on one user-facing or platform-facing change.
 2. Explain why the change matters, not only what changed.
-3. Update the README or other docs when behavior or setup changes.
+3. Update docs and environment examples when setup or runtime behavior changes.
 4. Make sure the GitHub Actions checks pass before requesting review.
 
-## Branching
+## Project areas
 
-- Start from `main`.
-- Use a short branch name that describes the change.
+- `app/` holds the Expo Router mobile experience.
+- `backend/` holds the Express API, migrations, and provider integrations.
+- `docs/` holds deployment and rollout notes.
 
-## Review checklist
+## Before you open a pull request
 
-Before opening a pull request, confirm that:
-
-- the change is scoped tightly
-- any new setup steps are documented
-- the change was tested in the most relevant way available
-- there are no unrelated files in the diff
+- run `npm install` if dependencies changed
+- run `npm run lint`
+- run `npm run backend:db:migrate`
+- confirm the backend health endpoint responds locally when backend code changes
+- double-check that secrets and local-only files are not part of the diff
