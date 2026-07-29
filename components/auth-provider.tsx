@@ -91,6 +91,7 @@ type CheckoutDemoInput = {
   };
   releaseReference: string;
   paymentSessionId?: string;
+  vendorReservationId?: string;
 };
 
 type AuthContextValue = {

@@ -1,4 +1,5 @@
 import { useRouter } from 'expo-router';
+import { useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 
 import { AppButton } from '@/components/app-button';
@@ -10,12 +11,35 @@ import { StatusChip } from '@/components/status-chip';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { payvayltData } from '@/constants/payvaylt-data';
+import { payVayltApi, VendorIntegrationSummary } from '@/lib/payvaylt-api';
 
 export default function StoresScreen() {
   const router = useRouter();
   const { session, supportFeed, voucherSummaries } = useAuth();
   const { vendors, merchantFlow, merchantDashboard } = payvayltData;
   const merchantSession = session?.role === 'merchant';
+  const [liveVendors, setLiveVendors] = useState<VendorIntegrationSummary[]>(vendors);
+
+  useEffect(() => {
+    let active = true;
+
+    payVayltApi
+      .bootstrap()
+      .then((payload) => {
+        if (!active || payload.vendors.length === 0) {
+          return;
+        }
+
+        setLiveVendors(payload.vendors);
+      })
+      .catch(() => {});
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const vendorList = liveVendors.length > 0 ? liveVendors : vendors;
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
@@ -57,7 +81,7 @@ export default function StoresScreen() {
         <ThemedText style={styles.sectionHint}>Pilot-ready merchants</ThemedText>
       </View>
       <View style={styles.vendorGrid}>
-        {vendors.map((vendor, index) => (
+        {vendorList.map((vendor, index) => (
           <ThemedView
             key={vendor.name}
             lightColor={index === 0 ? '#f8fbfe' : '#ffffff'}
@@ -68,7 +92,10 @@ export default function StoresScreen() {
                 <ThemedText type="cardTitle">{vendor.name}</ThemedText>
                 <ThemedText style={styles.supportText}>{vendor.category}</ThemedText>
               </View>
-              <StatusChip label={vendor.status} tone={index === 0 ? 'info' : 'success'} />
+              <StatusChip
+                label={vendor.status}
+                tone={vendor.status.toLowerCase().includes('connected') ? 'success' : index === 0 ? 'info' : 'warning'}
+              />
             </View>
             <ThemedText style={styles.supportText}>Integration: {vendor.integration}</ThemedText>
           </ThemedView>
