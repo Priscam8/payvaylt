@@ -9,6 +9,7 @@
     "ios": "expo run:ios",
     "mobile": "expo start --tunnel",
     "web": "expo start --web",
+    "web:export": "expo export --platform web",
     "app:open": "node ./scripts/open-payvaylt.mjs",
     "app:stop": "node ./scripts/stop-payvaylt.mjs",
     "lint": "expo lint",

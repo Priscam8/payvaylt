@@ -1,0 +1,64 @@
+services:
+  - type: web
+    name: payvaylt-api
+    runtime: docker
+    plan: starter
+    autoDeployTrigger: commit
+    healthCheckPath: /api/health
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PAYVAYLT_DATABASE_URL
+        sync: false
+      - key: PAYVAYLT_DATABASE_SSL
+        value: require
+      - key: PAYVAYLT_DATABASE_POOL_MAX
+        value: "10"
+      - key: PAYVAYLT_PUBLIC_APP_URL
+        sync: false
+      - key: PAYVAYLT_DOCUMENT_STORAGE
+        value: s3
+      - key: PAYVAYLT_MAX_UPLOAD_BYTES
+        value: "10485760"
+      - key: PAYVAYLT_S3_BUCKET
+        sync: false
+      - key: PAYVAYLT_S3_REGION
+        value: af-south-1
+      - key: PAYVAYLT_S3_ENDPOINT
+        sync: false
+      - key: PAYVAYLT_S3_FORCE_PATH_STYLE
+        value: "false"
+      - key: PAYVAYLT_S3_ACCESS_KEY_ID
+        sync: false
+      - key: PAYVAYLT_S3_SECRET_ACCESS_KEY
+        sync: false
+      - key: PAYVAYLT_ALLOW_DEV_CODES
+        value: "false"
+      - key: PAYVAYLT_OTP_PROVIDER
+        value: twilio
+      - key: PAYVAYLT_TWILIO_ACCOUNT_SID
+        sync: false
+      - key: PAYVAYLT_TWILIO_AUTH_TOKEN
+        sync: false
+      - key: PAYVAYLT_TWILIO_MESSAGING_SERVICE_SID
+        sync: false
+      - key: PAYVAYLT_TWILIO_FROM_NUMBER
+        sync: false
+      - key: PAYVAYLT_PAYMENT_PROVIDER
+        value: stripe
+      - key: PAYVAYLT_STRIPE_SECRET_KEY
+        sync: false
+      - key: PAYVAYLT_STRIPE_WEBHOOK_SECRET
+        sync: false
+
+  - type: web
+    name: payvaylt-app
+    runtime: static
+    buildCommand: npm install && npm run web:export
+    staticPublishPath: ./dist
+    autoDeployTrigger: commit
+    envVars:
+      - key: EXPO_PUBLIC_PAYVAYLT_API_URL
+        sync: false
