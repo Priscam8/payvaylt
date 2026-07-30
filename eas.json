@@ -17,7 +17,11 @@
       }
     },
     "production": {
-      "autoIncrement": true
+      "autoIncrement": true,
+      "env": {
+        "EXPO_PUBLIC_PAYVAYLT_API_URL": "https://payvaylt-api.onrender.com/api",
+        "PAYVAYLT_PUBLIC_APP_URL": "https://payvaylt-app.onrender.com"
+      }
     }
   },
   "submit": {
