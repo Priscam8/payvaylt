@@ -17,7 +17,10 @@
     "backend:db:start": "docker compose up -d postgres",
     "backend:db:stop": "docker compose stop postgres",
     "backend:db:migrate": "node backend/migrate.js",
-    "backend:check-production": "node backend/check-production-config.js"
+    "backend:check-production": "node backend/check-production-config.js",
+    "mobile:check-production": "node scripts/check-release-env.mjs --profile production",
+    "build:production:android": "node scripts/check-release-env.mjs --profile production && npx eas build --profile production --platform android",
+    "build:production:ios": "node scripts/check-release-env.mjs --profile production && npx eas build --profile production --platform ios"
   },
   "dependencies": {
     "@expo/vector-icons": "^15.0.3",

@@ -50,6 +50,8 @@ export default function RootLayout() {
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
           <Stack.Screen name="fica-upload" options={{ title: 'FICA Upload' }} />
           <Stack.Screen name="checkout-flow" options={{ title: 'Checkout Demo' }} />
+          <Stack.Screen name="payment-success" options={{ title: 'Payment Success' }} />
+          <Stack.Screen name="payment-cancelled" options={{ title: 'Payment Cancelled' }} />
           <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Blueprint' }} />
         </Stack>
         <StatusBar style="dark" />

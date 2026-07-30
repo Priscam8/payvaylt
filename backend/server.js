@@ -44,6 +44,7 @@ const {
 } = require('./providers/document-storage');
 const { getOtpProviderInfo } = require('./providers/otp-provider');
 const { getPaymentProviderInfo, verifyStripeWebhook } = require('./providers/payment-provider');
+const { getLaunchReadiness } = require('./production-readiness');
 
 const port = Number(process.env.PAYVAYLT_PORT || process.env.PORT || 4000);
 
@@ -352,6 +353,7 @@ app.get(
     const otpInfo = getOtpProviderInfo();
     const paymentInfo = getPaymentProviderInfo();
     const documentStorageInfo = getDocumentStorageInfo();
+    const readiness = getLaunchReadiness();
     res.json({
       ok: true,
       service: 'payvaylt-backend',
@@ -362,6 +364,12 @@ app.get(
       documentStorageTarget: documentStorageInfo.target,
       otpProvider: otpInfo.mode,
       paymentProvider: paymentInfo.mode,
+      readyForProduction: readiness.ready,
+      productionChecks: readiness.checks,
+      productionFailures: readiness.failures,
+      productionWarnings: readiness.warnings,
+      paymentSuccessUrl: readiness.paymentUrls.successUrl,
+      paymentCancelUrl: readiness.paymentUrls.cancelUrl,
       timestamp: new Date().toISOString(),
     });
   })

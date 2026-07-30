@@ -26,6 +26,7 @@ This repository contains an Expo + React Native product scaffold for that experi
 - `Stores` tab for vendor partnerships, checkout integrations, and voucher balances
 - `Account` tab for registration, OTP, FICA, verification questions, Home Affairs-style checks, and sign-out
 - `Checkout Demo` stack route for a full journey from merchant redirect to payment-session creation, confirmation, and release
+- `Payment Success` and `Payment Cancelled` routes so hosted checkout can return customers to a real PayVaylt screen
 - `Blueprint` modal describing the current product scope and next implementation steps
 - persistent local MVP state using device storage for accounts, sessions, lay-by plans, vouchers, notices, uploaded documents, and checkout outcomes
 
@@ -129,21 +130,24 @@ The backend serves on `http://localhost:4000` by default and exposes a versioned
 PayVaylt ships with a ready-to-edit [`.env.example`](./.env.example). Copy it to `.env` and adjust the values for your environment.
 
 - `EXPO_PUBLIC_PAYVAYLT_API_URL` points the Expo app to the backend API.
+- `PAYVAYLT_PUBLIC_APP_URL` gives PayVaylt a stable public app URL for Stripe return pages and other launch-ready flows.
 - `PAYVAYLT_DATABASE_URL` switches the backend from in-memory `pg-mem` to a real Postgres database.
 - `PAYVAYLT_DOCUMENT_STORAGE` can be `local` for development or `s3` for production uploads.
 - `PAYVAYLT_UPLOADS_DIR` controls where uploaded FICA documents are stored on disk during local development.
 - `PAYVAYLT_S3_*` variables connect production FICA uploads to S3-compatible object storage.
 - `PAYVAYLT_OTP_PROVIDER` supports `console` for local development and `twilio` for real OTP delivery.
 - `PAYVAYLT_PAYMENT_PROVIDER` supports `mock` for local development and `stripe` for hosted checkout.
+- `PAYVAYLT_STRIPE_SUCCESS_URL` and `PAYVAYLT_STRIPE_CANCEL_URL` are optional overrides. If they are blank, PayVaylt derives them from `PAYVAYLT_PUBLIC_APP_URL`.
 - `PAYVAYLT_ALLOW_DEV_CODES=true` keeps the OTP code visible in development responses when using the console provider.
 
 Before deploying, run:
 
 ```bash
 npm run backend:check-production
+npm run mobile:check-production
 ```
 
-This checks that Postgres, S3 document storage, Twilio OTP, Stripe payments, and production security values are configured.
+This checks that Postgres, S3 document storage, Twilio OTP, Stripe payments, production return URLs, mobile release API URLs, and production security values are configured.
 
 ### Useful endpoints
 
@@ -170,6 +174,8 @@ This checks that Postgres, S3 document storage, Twilio OTP, Stripe payments, and
 - `POST /api/payments/stripe/webhook`
 - `GET /api/merchants/:merchantId/workspace`
 
+The health endpoint now also reports `readyForProduction`, structured `productionChecks`, and the resolved Stripe return URLs so deployment verification is easier.
+
 ### Backend notes
 
 - SQL schema lives in [`backend/migrations/001_init.sql`](./backend/migrations/001_init.sql).
@@ -189,7 +195,7 @@ This checks that Postgres, S3 document storage, Twilio OTP, Stripe payments, and
 ## Deployment scaffolding
 
 - [Dockerfile](./Dockerfile) and [docker-compose.yml](./docker-compose.yml) scaffold backend container deployment.
-- [eas.json](./eas.json) scaffolds Expo Application Services builds for mobile distribution.
+- [eas.json](./eas.json) scaffolds Expo Application Services builds for mobile distribution without hard-coding a placeholder API URL into release builds.
 - [docs/deployment.md](./docs/deployment.md) has the deployment checklist, production environment variables, Stripe webhook path, and EAS build commands.
 - To go fully live, you still need real secrets and hosted infrastructure for Postgres, OTP delivery, payments, and file storage.
 

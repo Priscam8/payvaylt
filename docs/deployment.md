@@ -8,6 +8,7 @@ This guide turns the local MVP into a deployable PayVaylt stack. The code is rea
 - S3-compatible object storage for uploaded FICA documents. AWS S3, Cloudflare R2, MinIO, or another S3-compatible provider can work.
 - Twilio SMS credentials for real OTP delivery.
 - Stripe credentials and webhook secret for checkout payment sessions.
+- A public PayVaylt app URL, for example `https://payvaylt.co.za`, so hosted payments can return customers to a real PayVaylt screen.
 - A deployed backend URL, for example `https://api.payvaylt.co.za/api`.
 - Expo Application Services access for Android and iOS builds.
 
@@ -21,6 +22,7 @@ PAYVAYLT_PORT=4000
 PAYVAYLT_DATABASE_URL=postgres://USER:PASSWORD@HOST:5432/payvaylt
 PAYVAYLT_DATABASE_SSL=require
 PAYVAYLT_DATABASE_POOL_MAX=10
+PAYVAYLT_PUBLIC_APP_URL=https://payvaylt.co.za
 
 PAYVAYLT_DOCUMENT_STORAGE=s3
 PAYVAYLT_MAX_UPLOAD_BYTES=10485760
@@ -40,8 +42,9 @@ PAYVAYLT_TWILIO_MESSAGING_SERVICE_SID=replace_me
 PAYVAYLT_PAYMENT_PROVIDER=stripe
 PAYVAYLT_STRIPE_SECRET_KEY=sk_live_replace_me
 PAYVAYLT_STRIPE_WEBHOOK_SECRET=whsec_replace_me
-PAYVAYLT_STRIPE_SUCCESS_URL=https://payvaylt.co.za/payment-success
-PAYVAYLT_STRIPE_CANCEL_URL=https://payvaylt.co.za/payment-cancelled
+# Optional overrides. Leave blank to derive these from PAYVAYLT_PUBLIC_APP_URL.
+PAYVAYLT_STRIPE_SUCCESS_URL=
+PAYVAYLT_STRIPE_CANCEL_URL=
 ```
 
 If you use Cloudflare R2 or MinIO, set `PAYVAYLT_S3_ENDPOINT` and usually set `PAYVAYLT_S3_FORCE_PATH_STYLE=true`.
@@ -52,9 +55,10 @@ After setting your environment variables, run:
 
 ```bash
 npm run backend:check-production
+npm run mobile:check-production
 ```
 
-This fails loudly if Postgres, S3 storage, Twilio, Stripe, or production security settings are missing.
+This fails loudly if Postgres, S3 storage, Twilio, Stripe, hosted payment return URLs, mobile release API URLs, or production security settings are missing.
 
 ## 4. Deploy The Backend
 
@@ -77,7 +81,7 @@ Production health endpoint:
 curl https://YOUR_BACKEND_DOMAIN/api/health
 ```
 
-Expected fields include `databaseMode`, `documentStorage`, `otpProvider`, and `paymentProvider`.
+Expected fields include `databaseMode`, `documentStorage`, `otpProvider`, `paymentProvider`, `readyForProduction`, and `productionChecks`.
 
 ## 5. Configure Stripe Webhook
 
@@ -97,10 +101,10 @@ Copy the signing secret into `PAYVAYLT_STRIPE_WEBHOOK_SECRET`.
 
 ## 6. Build The Mobile App
 
-Update `eas.json` so `EXPO_PUBLIC_PAYVAYLT_API_URL` points to your deployed backend:
+Export `EXPO_PUBLIC_PAYVAYLT_API_URL` so production builds point to your deployed backend:
 
-```json
-"EXPO_PUBLIC_PAYVAYLT_API_URL": "https://YOUR_BACKEND_DOMAIN/api"
+```bash
+export EXPO_PUBLIC_PAYVAYLT_API_URL=https://YOUR_BACKEND_DOMAIN/api
 ```
 
 Preview Android build:
@@ -112,13 +116,13 @@ npx eas build --profile preview --platform android
 Production Android build:
 
 ```bash
-npx eas build --profile production --platform android
+npm run build:production:android
 ```
 
 Production iOS build:
 
 ```bash
-npx eas build --profile production --platform ios
+npm run build:production:ios
 ```
 
 When builds are ready, submit them through the Expo dashboard or with:
@@ -131,9 +135,11 @@ npx eas submit --profile production --platform ios
 ## 7. Final Go-Live Checklist
 
 - `GET /api/health` shows `databaseMode=postgres`, `documentStorage=s3`, `otpProvider=twilio`, and `paymentProvider=stripe`.
+- `GET /api/health` shows `readyForProduction=true` and every item inside `productionChecks` reports `pass` instead of `fail`.
 - OTP messages arrive on a real phone number.
 - A FICA PDF or image uploads and appears in object storage.
-- Stripe checkout opens, succeeds, and the webhook marks the payment session as paid.
+- Stripe checkout opens, succeeds, returns to `/payment-success`, and the webhook marks the payment session as paid.
+- A cancelled Stripe checkout returns to `/payment-cancelled` without losing the PayVaylt session context.
 - The checkout demo completes and creates a completed lay-by plan.
 - `EXPO_PUBLIC_PAYVAYLT_API_URL` in EAS builds points to the production backend, not localhost.
 - `PAYVAYLT_ALLOW_DEV_CODES` is disabled in production.

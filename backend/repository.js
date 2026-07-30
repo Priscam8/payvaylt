@@ -1490,9 +1490,10 @@ async function createCheckoutPaymentSession(payload) {
   );
 
   const createdAt = new Date().toISOString();
+  const paymentSessionId = createId('payment-session');
   if (amount === 0) {
     const immediateSession = {
-      id: createId('payment-session'),
+      id: paymentSessionId,
       customerId: null,
       provider: 'payvaylt',
       providerReference: null,
@@ -1516,11 +1517,13 @@ async function createCheckoutPaymentSession(payload) {
   }
 
   const providerSession = await createProviderPaymentSession({
+    paymentSessionId,
     amount,
     currency: 'ZAR',
     itemName: `${payload.journey.store} lay-by payment`,
     description: `${payload.journey.leadItem} (${payload.journey.cartId})`,
     metadata: {
+      payvayltPaymentSessionId: paymentSessionId,
       cartId: payload.journey.cartId,
       customerEmail: payload.registration.email,
       customerMobile: payload.registration.mobile,
@@ -1529,7 +1532,7 @@ async function createCheckoutPaymentSession(payload) {
   });
 
   const paymentSession = {
-    id: createId('payment-session'),
+    id: paymentSessionId,
     customerId: null,
     provider: providerSession.provider,
     providerReference: providerSession.providerReference,
@@ -1539,6 +1542,7 @@ async function createCheckoutPaymentSession(payload) {
     status: providerSession.status,
     checkoutUrl: providerSession.checkoutUrl ?? null,
     metadata: {
+      payvayltPaymentSessionId: paymentSessionId,
       cartId: payload.journey.cartId,
       customerEmail: normalizeEmail(payload.registration.email),
       customerMobile: normalizeMobile(payload.registration.mobile),

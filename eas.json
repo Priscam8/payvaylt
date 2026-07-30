@@ -8,9 +8,6 @@
       "distribution": "internal",
       "android": {
         "buildType": "apk"
-      },
-      "env": {
-        "EXPO_PUBLIC_PAYVAYLT_API_URL": "https://api.payvaylt.example/api"
       }
     },
     "ios-simulator": {
@@ -20,10 +17,7 @@
       }
     },
     "production": {
-      "autoIncrement": true,
-      "env": {
-        "EXPO_PUBLIC_PAYVAYLT_API_URL": "https://api.payvaylt.example/api"
-      }
+      "autoIncrement": true
     }
   },
   "submit": {
