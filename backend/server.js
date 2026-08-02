@@ -16,6 +16,13 @@ const {
   normalizeMobile,
   publicCatalog,
 } = require('./domain');
+const {
+  applyOrderStatus,
+  createBankReference,
+  createPosOrder,
+  getRecentPosOrders,
+  sortOrdersByNewest,
+} = require('./pos-domain');
 const { dataFile, getDatabase, mutateDatabase } = require('./store');
 
 const port = Number(process.env.PAYVAYLT_PORT || process.env.PORT || 4000);
@@ -24,6 +31,8 @@ const app = express();
 
 app.use(cors());
 app.use(express.json());
+
+const posSourceValues = ['catalog', 'manual', 'service'];
 
 function sendError(res, status, error, details) {
   res.status(status).json({
@@ -166,6 +175,23 @@ const checkoutSchema = z.object({
   releaseReference: z.string().min(5),
 });
 
+const posOrderItemSchema = z.object({
+  key: z.string().min(2),
+  name: z.string().min(2),
+  price: z.number().positive(),
+  quantity: z.number().int().min(1),
+  source: z.enum(posSourceValues),
+  note: z.string().min(2),
+});
+
+const posCreateOrderSchema = z.object({
+  items: z.array(posOrderItemSchema).min(1),
+});
+
+const posOutcomeSchema = z.object({
+  outcome: z.enum(['paid', 'declined']),
+});
+
 function parseBody(schema, req, res) {
   const result = schema.safeParse(req.body);
   if (!result.success) {
@@ -229,6 +255,31 @@ function buildCustomerDashboard(customerId) {
   };
 }
 
+function createPosOrderId() {
+  return `ORD-${createId('pos')
+    .replace(/^pos-/, '')
+    .replace(/-/g, '')
+    .slice(0, 10)
+    .toUpperCase()}`;
+}
+
+function buildPosBootstrap() {
+  const pos = getDatabase().pos;
+
+  return {
+    merchant: pos.merchant,
+    products: pos.products.filter((product) => product.active !== false),
+    recentOrders: getRecentPosOrders(pos),
+  };
+}
+
+function buildPosResponse(order) {
+  return {
+    order,
+    recentOrders: getRecentPosOrders(getDatabase().pos),
+  };
+}
+
 app.get('/api/health', (_req, res) => {
   res.json({
     ok: true,
@@ -256,6 +307,152 @@ app.get('/api/catalog/bootstrap', (_req, res) => {
       },
     },
   });
+});
+
+app.get('/api/pos/bootstrap', (_req, res) => {
+  res.json(buildPosBootstrap());
+});
+
+app.get('/api/pos/orders', (_req, res) => {
+  res.json({
+    orders: getRecentPosOrders(getDatabase().pos, 20),
+  });
+});
+
+app.get('/api/pos/orders/:orderId', (req, res) => {
+  const order = getDatabase().pos.orders.find((candidate) => candidate.id === req.params.orderId);
+  if (!order) {
+    return sendError(res, 404, 'That POS order could not be found.');
+  }
+
+  return res.json({ order });
+});
+
+app.post('/api/pos/orders', (req, res) => {
+  const payload = parseBody(posCreateOrderSchema, req, res);
+  if (!payload) return;
+
+  const merchant = getDatabase().pos.merchant;
+  const order = createPosOrder(createPosOrderId(), merchant, payload.items);
+
+  mutateDatabase((database) => {
+    database.pos.orders = sortOrdersByNewest([
+      order,
+      ...database.pos.orders.filter((candidate) => candidate.id !== order.id),
+    ]);
+  });
+
+  return res.status(201).json(buildPosResponse(order));
+});
+
+app.post('/api/pos/orders/:orderId/send-to-bank', (req, res) => {
+  const currentOrder = getDatabase().pos.orders.find((candidate) => candidate.id === req.params.orderId);
+  if (!currentOrder) {
+    return sendError(res, 404, 'That POS order could not be found.');
+  }
+
+  if (currentOrder.status !== 'awaiting_customer') {
+    return sendError(
+      res,
+      409,
+      'Only orders awaiting customer review can move into bank approval.'
+    );
+  }
+
+  let updatedOrder = null;
+
+  mutateDatabase((database) => {
+    updatedOrder = applyOrderStatus(
+      currentOrder,
+      'awaiting_bank',
+      'Customer approved the basket in WhatsApp and moved to bank approval.'
+    );
+    database.pos.orders = sortOrdersByNewest(
+      database.pos.orders.map((candidate) =>
+        candidate.id === req.params.orderId ? updatedOrder : candidate
+      )
+    );
+  });
+
+  return res.json(buildPosResponse(updatedOrder));
+});
+
+app.post('/api/pos/orders/:orderId/payment-outcome', (req, res) => {
+  const payload = parseBody(posOutcomeSchema, req, res);
+  if (!payload) return;
+
+  const currentOrder = getDatabase().pos.orders.find((candidate) => candidate.id === req.params.orderId);
+  if (!currentOrder) {
+    return sendError(res, 404, 'That POS order could not be found.');
+  }
+
+  if (currentOrder.status !== 'awaiting_bank') {
+    return sendError(
+      res,
+      409,
+      'Only orders awaiting bank approval can receive a payment outcome.'
+    );
+  }
+
+  let updatedOrder = null;
+
+  mutateDatabase((database) => {
+    updatedOrder =
+      payload.outcome === 'paid'
+        ? applyOrderStatus(currentOrder, 'paid', 'Bank confirmed the payment and released the receipt.', {
+            bankReference: createBankReference(currentOrder.id),
+            declineReason: undefined,
+          })
+        : applyOrderStatus(
+            currentOrder,
+            'declined',
+            'Customer declined the request in the banking app.',
+            {
+              declineReason: 'Customer declined the request in the banking app.',
+              bankReference: undefined,
+            }
+          );
+
+    database.pos.orders = sortOrdersByNewest(
+      database.pos.orders.map((candidate) =>
+        candidate.id === req.params.orderId ? updatedOrder : candidate
+      )
+    );
+  });
+
+  return res.json(buildPosResponse(updatedOrder));
+});
+
+app.post('/api/pos/orders/:orderId/cancel', (req, res) => {
+  const currentOrder = getDatabase().pos.orders.find((candidate) => candidate.id === req.params.orderId);
+  if (!currentOrder) {
+    return sendError(res, 404, 'That POS order could not be found.');
+  }
+
+  if (currentOrder.status === 'paid') {
+    return sendError(res, 409, 'Paid orders cannot be cancelled from the checkout demo.');
+  }
+
+  if (currentOrder.status === 'cancelled') {
+    return res.json(buildPosResponse(currentOrder));
+  }
+
+  let updatedOrder = null;
+
+  mutateDatabase((database) => {
+    updatedOrder = applyOrderStatus(
+      currentOrder,
+      'cancelled',
+      'Merchant cancelled the checkout before settlement.'
+    );
+    database.pos.orders = sortOrdersByNewest(
+      database.pos.orders.map((candidate) =>
+        candidate.id === req.params.orderId ? updatedOrder : candidate
+      )
+    );
+  });
+
+  return res.json(buildPosResponse(updatedOrder));
 });
 
 app.post('/api/auth/customers/register', (req, res) => {

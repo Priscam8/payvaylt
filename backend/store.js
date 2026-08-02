@@ -2,6 +2,7 @@ const fs = require('fs');
 const path = require('path');
 
 const { createSeedDatabase, resolveDataFile } = require('./domain');
+const { normalizePosDatabaseState } = require('./pos-domain');
 
 const dataFile = resolveDataFile(process.env.PAYVAYLT_DATA_FILE);
 
@@ -18,13 +19,26 @@ function readDatabase() {
   try {
     if (fs.existsSync(dataFile)) {
       const contents = fs.readFileSync(dataFile, 'utf8');
-      return JSON.parse(contents);
+      const database = JSON.parse(contents);
+      const normalized = {
+        ...database,
+        pos: normalizePosDatabaseState(database.pos),
+      };
+
+      if (!database.pos) {
+        writeDatabase(normalized);
+      }
+
+      return normalized;
     }
   } catch (error) {
     console.warn('[payvaylt-backend] Could not read persisted database, reseeding demo data.', error);
   }
 
-  const seeded = createSeedDatabase();
+  const seeded = {
+    ...createSeedDatabase(),
+    pos: normalizePosDatabaseState(),
+  };
   writeDatabase(seeded);
   return seeded;
 }

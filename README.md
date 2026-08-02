@@ -16,6 +16,7 @@ The product promise is simple:
 - `Overview` tab for the business case, core journey, and target sectors
 - `Modes` tab for delivery methods, service definitions, and MVP deliverables
 - `Checkout` tab with a live merchant basket, dynamic QR, WhatsApp review, and bank approval simulation
+- persisted POS order history that survives reloads when the local API is running
 - `Readiness` tab for platform boundaries, architecture, and launch stage gates
 - `Scan-to-Pay Demo` stack route for the full interactive walkthrough
 - `Investor Brief` modal describing what to build first, what to partner next, and what not to promise yet
@@ -39,11 +40,11 @@ npm install
 npx expo start
 ```
 
-## Optional backend
+## POS backend
 
-The repository still includes the earlier Express scaffold in `backend/`. It is useful as a future starting point for merchant, customer, and checkout services, but the current investor POS demo is front-end driven and does not yet depend on a live bank or WhatsApp integration.
+The Express backend in `backend/` now powers the WhatsApp POS demo with a persisted merchant profile, product catalog, dynamic checkout orders, bank-approval state changes, and recent transaction history. The payment rail is still simulated for investor use, but the order lifecycle is now API-backed instead of living only inside the screen state.
 
-If you want to run that scaffold locally:
+Run it locally with:
 
 ```bash
 npm run backend
@@ -56,3 +57,13 @@ npm run backend:dev
 ```
 
 The backend serves on `http://localhost:4000` by default and exposes a versioned API under `http://localhost:4000/api`.
+
+The POS-specific endpoints are:
+
+- `GET /api/pos/bootstrap`
+- `GET /api/pos/orders`
+- `GET /api/pos/orders/:orderId`
+- `POST /api/pos/orders`
+- `POST /api/pos/orders/:orderId/send-to-bank`
+- `POST /api/pos/orders/:orderId/payment-outcome`
+- `POST /api/pos/orders/:orderId/cancel`
