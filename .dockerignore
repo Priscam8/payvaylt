@@ -5,3 +5,5 @@ web-build
 backend/uploads
 .env
 npm-debug.log*
+.DS_Store
+._*
