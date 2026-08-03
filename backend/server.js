@@ -45,6 +45,14 @@ const {
 const { getOtpProviderInfo } = require('./providers/otp-provider');
 const { getPaymentProviderInfo, verifyStripeWebhook } = require('./providers/payment-provider');
 const { getLaunchReadiness } = require('./production-readiness');
+const {
+  buildWebhookConfig,
+  getRecentEvents,
+  recordWebhookEvent,
+  recordWebhookVerification,
+  summarizeWebhookPayload,
+  verifyWebhookSignature,
+} = require('./whatsapp-domain');
 
 const port = Number(process.env.PAYVAYLT_PORT || process.env.PORT || 4000);
 
@@ -65,7 +73,15 @@ app.post(
     res.json({ received: true });
   })
 );
-app.use(express.json());
+app.use(
+  express.json({
+    verify(req, _res, buffer) {
+      if (buffer?.length) {
+        req.rawBody = Buffer.from(buffer);
+      }
+    },
+  })
+);
 
 function sendError(res, status, error, details) {
   res.status(status).json({
@@ -370,6 +386,7 @@ app.get(
       productionWarnings: readiness.warnings,
       paymentSuccessUrl: readiness.paymentUrls.successUrl,
       paymentCancelUrl: readiness.paymentUrls.cancelUrl,
+      publicApiUrl: readiness.apiUrls.publicApiUrl,
       timestamp: new Date().toISOString(),
     });
   })
@@ -381,6 +398,58 @@ app.get(
     res.json(await getPublicBootstrap());
   })
 );
+
+app.get('/api/whatsapp/config', (_req, res) => {
+  res.json({
+    whatsapp: buildWebhookConfig(),
+  });
+});
+
+app.get('/api/whatsapp/events', (_req, res) => {
+  res.json({
+    events: getRecentEvents(),
+  });
+});
+
+app.get('/api/whatsapp/webhook', (req, res) => {
+  const mode = String(req.query['hub.mode'] || '');
+  const verifyToken = String(req.query['hub.verify_token'] || '');
+  const challenge = String(req.query['hub.challenge'] || '');
+  const expectedToken = buildWebhookConfig().verifyToken;
+
+  if (mode === 'subscribe' && challenge && verifyToken === expectedToken) {
+    recordWebhookVerification();
+    return res.status(200).type('text/plain').send(challenge);
+  }
+
+  return sendError(res, 403, 'WhatsApp webhook verification failed.', {
+    mode,
+    challengePresent: challenge.length > 0,
+  });
+});
+
+app.post('/api/whatsapp/webhook', (req, res) => {
+  const signatureHeader = req.headers['x-hub-signature-256'];
+  const signature =
+    typeof signatureHeader === 'string' ? signatureHeader : Array.isArray(signatureHeader) ? signatureHeader[0] : '';
+  const signatureResult = verifyWebhookSignature(req.rawBody, signature);
+
+  if (!signatureResult.valid) {
+    return sendError(res, 401, 'WhatsApp webhook signature validation failed.', {
+      reason: signatureResult.reason,
+    });
+  }
+
+  const event = recordWebhookEvent(summarizeWebhookPayload(req.body));
+
+  return res.json({
+    received: true,
+    signatureValidated: signatureResult.enabled,
+    messages: event.messages.length,
+    statuses: event.statuses.length,
+    orderReferences: event.orderReferences,
+  });
+});
 
 app.get(
   '/api/vendors',

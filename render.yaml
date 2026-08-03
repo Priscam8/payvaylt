@@ -18,6 +18,8 @@ services:
         value: "10"
       - key: PAYVAYLT_PUBLIC_APP_URL
         sync: false
+      - key: PAYVAYLT_PUBLIC_API_URL
+        sync: false
       - key: PAYVAYLT_DOCUMENT_STORAGE
         value: s3
       - key: PAYVAYLT_MAX_UPLOAD_BYTES
@@ -51,6 +53,18 @@ services:
       - key: PAYVAYLT_STRIPE_SECRET_KEY
         sync: false
       - key: PAYVAYLT_STRIPE_WEBHOOK_SECRET
+        sync: false
+      - key: PAYVAYLT_WHATSAPP_VERIFY_TOKEN
+        sync: false
+      - key: PAYVAYLT_WHATSAPP_APP_SECRET
+        sync: false
+      - key: PAYVAYLT_WHATSAPP_APP_ID
+        sync: false
+      - key: PAYVAYLT_WHATSAPP_BUSINESS_ACCOUNT_ID
+        sync: false
+      - key: PAYVAYLT_WHATSAPP_PHONE_NUMBER_ID
+        sync: false
+      - key: PAYVAYLT_WHATSAPP_ACCESS_TOKEN
         sync: false
 
   - type: web

@@ -131,6 +131,7 @@ PayVaylt ships with a ready-to-edit [`.env.example`](./.env.example). Copy it to
 
 - `EXPO_PUBLIC_PAYVAYLT_API_URL` points the Expo app to the backend API.
 - `PAYVAYLT_PUBLIC_APP_URL` gives PayVaylt a stable public app URL for Stripe return pages and other launch-ready flows.
+- `PAYVAYLT_PUBLIC_API_URL` gives Meta and other server-to-server integrations a stable public `/api` base URL.
 - `PAYVAYLT_DATABASE_URL` switches the backend from in-memory `pg-mem` to a real Postgres database.
 - `PAYVAYLT_DOCUMENT_STORAGE` can be `local` for development or `s3` for production uploads.
 - `PAYVAYLT_UPLOADS_DIR` controls where uploaded FICA documents are stored on disk during local development.
@@ -139,6 +140,7 @@ PayVaylt ships with a ready-to-edit [`.env.example`](./.env.example). Copy it to
 - `PAYVAYLT_PAYMENT_PROVIDER` supports `mock` for local development and `stripe` for hosted checkout.
 - `PAYVAYLT_STRIPE_SUCCESS_URL` and `PAYVAYLT_STRIPE_CANCEL_URL` are optional overrides. If they are blank, PayVaylt derives them from `PAYVAYLT_PUBLIC_APP_URL`.
 - `PAYVAYLT_ALLOW_DEV_CODES=true` keeps the OTP code visible in development responses when using the console provider.
+- `PAYVAYLT_WHATSAPP_VERIFY_TOKEN`, `PAYVAYLT_WHATSAPP_APP_SECRET`, and `PAYVAYLT_WHATSAPP_ACCESS_TOKEN` prepare the backend for Meta WhatsApp Cloud API webhooks.
 
 Before deploying, run:
 
@@ -149,10 +151,38 @@ npm run mobile:check-production
 
 This checks that Postgres, S3 document storage, Twilio OTP, Stripe payments, production return URLs, mobile release API URLs, and production security values are configured.
 
+## WhatsApp Cloud API readiness
+
+The backend now exposes the Meta webhook routes needed to start wiring PayVaylt into WhatsApp Cloud API:
+
+- `GET /api/whatsapp/config`
+- `GET /api/whatsapp/events`
+- `GET /api/whatsapp/webhook`
+- `POST /api/whatsapp/webhook`
+
+`GET /api/whatsapp/config` returns the callback URL and verify-token values that belong in the Meta developer form once `PAYVAYLT_PUBLIC_API_URL` points to a live backend.
+
+Example local check:
+
+```bash
+curl http://localhost:4000/api/whatsapp/config
+```
+
+For Meta production setup:
+
+- **Callback URL:** `${PAYVAYLT_PUBLIC_API_URL}/whatsapp/webhook`
+- **Verify token:** `PAYVAYLT_WHATSAPP_VERIFY_TOKEN`
+
+Meta cannot verify a localhost callback, so you still need a deployed public backend URL before the production webhook step will save successfully.
+
 ### Useful endpoints
 
 - `GET /api/health`
 - `GET /api/catalog/bootstrap`
+- `GET /api/whatsapp/config`
+- `GET /api/whatsapp/events`
+- `GET /api/whatsapp/webhook`
+- `POST /api/whatsapp/webhook`
 - `GET /api/vendors`
 - `GET /api/vendors/:vendorSlug/catalog`
 - `POST /api/vendors/:vendorSlug/reservations`
@@ -184,7 +214,9 @@ The health endpoint now also reports `readyForProduction`, structured `productio
 - If `PAYVAYLT_DATABASE_URL` is set, the backend uses your real Postgres database.
 - If `PAYVAYLT_DATABASE_URL` is not set, the backend uses an in-memory Postgres instance via `pg-mem` so local demo work still runs.
 - Expo can point to the backend with `EXPO_PUBLIC_PAYVAYLT_API_URL=http://localhost:4000/api`.
+- Meta webhook verification should point to `PAYVAYLT_PUBLIC_API_URL/whatsapp/webhook`.
 - [`backend/repository.js`](./backend/repository.js) is the database-backed repository layer used by the API routes.
+- [`backend/whatsapp-domain.js`](./backend/whatsapp-domain.js) holds the Meta webhook config, signature validation, and inbound event summarization helpers.
 - vendor adapter packages live in [`packages/vendor-integrations`](./packages/vendor-integrations).
 - customer document uploads are stored via [`backend/providers/document-storage.js`](./backend/providers/document-storage.js).
 - OTP delivery is abstracted in [`backend/providers/otp-provider.js`](./backend/providers/otp-provider.js).
