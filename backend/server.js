@@ -24,13 +24,27 @@ const {
   sortOrdersByNewest,
 } = require('./pos-domain');
 const { dataFile, getDatabase, mutateDatabase } = require('./store');
+const {
+  buildWebhookConfig,
+  normalizePhoneNumber,
+  summarizeWebhookPayload,
+  verifyWebhookSignature,
+} = require('./whatsapp-domain');
 
 const port = Number(process.env.PAYVAYLT_PORT || process.env.PORT || 4000);
 
 const app = express();
 
 app.use(cors());
-app.use(express.json());
+app.use(
+  express.json({
+    verify(req, _res, buffer) {
+      if (buffer?.length) {
+        req.rawBody = Buffer.from(buffer);
+      }
+    },
+  })
+);
 
 const posSourceValues = ['catalog', 'manual', 'service'];
 
@@ -39,6 +53,35 @@ function sendError(res, status, error, details) {
     error,
     ...(details ? { details } : {}),
   });
+}
+
+function buildWhatsAppReviewText(order) {
+  const lines = [
+    `Review order ${order.token}`,
+    order.merchantName,
+    ...order.items.map((item) =>
+      `- ${item.name} x${item.quantity} (${formatCurrency(item.price * item.quantity)})`
+    ),
+    `Total ${formatCurrency(order.total)}`,
+    'Reply PAY to continue or HELP if anything is incorrect.',
+  ];
+
+  return lines.join('\n');
+}
+
+function buildWhatsAppEntry(order) {
+  const merchantNumber = normalizePhoneNumber(getDatabase().pos.merchant.whatsappNumber);
+
+  return {
+    orderId: order.id,
+    orderToken: order.token,
+    prefilledMessage: buildWhatsAppReviewText(order),
+    entryUrl: merchantNumber
+      ? `https://wa.me/${merchantNumber.replace(/^\+/, '')}?text=${encodeURIComponent(
+          `Review order ${order.token}`
+        )}`
+      : null,
+  };
 }
 
 function extractToken(req) {
@@ -309,6 +352,67 @@ app.get('/api/catalog/bootstrap', (_req, res) => {
   });
 });
 
+app.get('/api/whatsapp/config', (_req, res) => {
+  res.json({
+    whatsapp: buildWebhookConfig(getDatabase().whatsapp),
+  });
+});
+
+app.get('/api/whatsapp/events', (_req, res) => {
+  const whatsapp = getDatabase().whatsapp;
+  res.json({
+    events: whatsapp.events.slice(0, 20),
+  });
+});
+
+app.get('/api/whatsapp/webhook', (req, res) => {
+  const mode = String(req.query['hub.mode'] || '');
+  const verifyToken = String(req.query['hub.verify_token'] || '');
+  const challenge = String(req.query['hub.challenge'] || '');
+  const expectedToken = getDatabase().whatsapp.config.verifyToken;
+
+  if (mode === 'subscribe' && challenge && verifyToken === expectedToken) {
+    mutateDatabase((database) => {
+      database.whatsapp.config.lastVerifiedAt = new Date().toISOString();
+    });
+
+    return res.status(200).type('text/plain').send(challenge);
+  }
+
+  return sendError(res, 403, 'WhatsApp webhook verification failed.', {
+    mode,
+    challengePresent: challenge.length > 0,
+  });
+});
+
+app.post('/api/whatsapp/webhook', (req, res) => {
+  const signatureHeader = req.headers['x-hub-signature-256'];
+  const signature =
+    typeof signatureHeader === 'string' ? signatureHeader : Array.isArray(signatureHeader) ? signatureHeader[0] : '';
+  const signatureResult = verifyWebhookSignature(req.rawBody, signature);
+
+  if (!signatureResult.valid) {
+    return sendError(res, 401, 'WhatsApp webhook signature validation failed.', {
+      reason: signatureResult.reason,
+    });
+  }
+
+  const event = summarizeWebhookPayload(req.body);
+
+  mutateDatabase((database) => {
+    database.whatsapp.config.lastEventAt = event.receivedAt;
+    database.whatsapp.events = [event, ...database.whatsapp.events].slice(0, 25);
+  });
+
+  return res.json({
+    received: true,
+    signatureValidated: signatureResult.enabled,
+    messages: event.messages.length,
+    statuses: event.statuses.length,
+    orderReferences: event.orderReferences,
+  });
+});
+
 app.get('/api/pos/bootstrap', (_req, res) => {
   res.json(buildPosBootstrap());
 });
@@ -326,6 +430,18 @@ app.get('/api/pos/orders/:orderId', (req, res) => {
   }
 
   return res.json({ order });
+});
+
+app.get('/api/pos/orders/:orderId/whatsapp-entry', (req, res) => {
+  const order = getDatabase().pos.orders.find((candidate) => candidate.id === req.params.orderId);
+  if (!order) {
+    return sendError(res, 404, 'That POS order could not be found.');
+  }
+
+  return res.json({
+    entry: buildWhatsAppEntry(order),
+    order,
+  });
 });
 
 app.post('/api/pos/orders', (req, res) => {

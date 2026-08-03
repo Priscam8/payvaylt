@@ -63,7 +63,62 @@ The POS-specific endpoints are:
 - `GET /api/pos/bootstrap`
 - `GET /api/pos/orders`
 - `GET /api/pos/orders/:orderId`
+- `GET /api/pos/orders/:orderId/whatsapp-entry`
 - `POST /api/pos/orders`
 - `POST /api/pos/orders/:orderId/send-to-bank`
 - `POST /api/pos/orders/:orderId/payment-outcome`
 - `POST /api/pos/orders/:orderId/cancel`
+
+## WhatsApp Cloud API readiness
+
+The backend now includes the Meta webhook routes needed for a real WhatsApp integration:
+
+- `GET /api/whatsapp/config`
+- `GET /api/whatsapp/events`
+- `GET /api/whatsapp/webhook`
+- `POST /api/whatsapp/webhook`
+
+`GET /api/whatsapp/config` is the quickest way to confirm which values belong in the Meta developer form. Once `PAYVAYLT_PUBLIC_BASE_URL` is set, it returns the public callback URL alongside the active verify token.
+
+Example local check:
+
+```bash
+curl http://localhost:4000/api/whatsapp/config
+```
+
+### Meta production setup values
+
+Use these values on the Meta "Configure Webhooks" step:
+
+- **Callback URL:** `https://your-public-backend.example.com/api/whatsapp/webhook`
+- **Verify token:** the value in `PAYVAYLT_WHATSAPP_VERIFY_TOKEN`
+
+Important: Meta cannot verify a localhost callback. GitHub is the right place for the codebase, but you still need a public backend URL from a deployed server or tunnel before Meta can save the webhook.
+
+### Environment variables
+
+Copy `.env.example` and fill in the WhatsApp values you receive from Meta:
+
+- `PAYVAYLT_PUBLIC_BASE_URL`
+- `PAYVAYLT_WHATSAPP_VERIFY_TOKEN`
+- `PAYVAYLT_WHATSAPP_APP_SECRET`
+- `PAYVAYLT_WHATSAPP_APP_ID`
+- `PAYVAYLT_WHATSAPP_BUSINESS_ACCOUNT_ID`
+- `PAYVAYLT_WHATSAPP_PHONE_NUMBER_ID`
+- `PAYVAYLT_WHATSAPP_ACCESS_TOKEN`
+
+If `PAYVAYLT_WHATSAPP_APP_SECRET` is set, the webhook endpoint verifies Meta's `X-Hub-Signature-256` header before accepting inbound events.
+
+### Order review handoff
+
+For each POS order, the backend can now return a WhatsApp-friendly entry payload:
+
+```bash
+curl http://localhost:4000/api/pos/orders/ORD-EXAMPLE/whatsapp-entry
+```
+
+This response includes:
+
+- a WhatsApp deep link that can be encoded into a checkout QR
+- the short prefilled message for the customer
+- the order token and current basket details

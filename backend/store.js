@@ -3,6 +3,7 @@ const path = require('path');
 
 const { createSeedDatabase, resolveDataFile } = require('./domain');
 const { normalizePosDatabaseState } = require('./pos-domain');
+const { normalizeWhatsAppDatabaseState } = require('./whatsapp-domain');
 
 const dataFile = resolveDataFile(process.env.PAYVAYLT_DATA_FILE);
 
@@ -23,9 +24,10 @@ function readDatabase() {
       const normalized = {
         ...database,
         pos: normalizePosDatabaseState(database.pos),
+        whatsapp: normalizeWhatsAppDatabaseState(database.whatsapp),
       };
 
-      if (!database.pos) {
+      if (!database.pos || !database.whatsapp) {
         writeDatabase(normalized);
       }
 
@@ -38,6 +40,7 @@ function readDatabase() {
   const seeded = {
     ...createSeedDatabase(),
     pos: normalizePosDatabaseState(),
+    whatsapp: normalizeWhatsAppDatabaseState(),
   };
   writeDatabase(seeded);
   return seeded;
