@@ -46,10 +46,14 @@ const { getOtpProviderInfo } = require('./providers/otp-provider');
 const { getPaymentProviderInfo, verifyStripeWebhook } = require('./providers/payment-provider');
 const { getLaunchReadiness } = require('./production-readiness');
 const {
+  buildCheckoutReceiptMessage,
+  buildMessagingConfig,
   buildWebhookConfig,
   getRecentEvents,
   recordWebhookEvent,
   recordWebhookVerification,
+  sendWhatsAppTemplateMessage,
+  sendWhatsAppTextMessage,
   summarizeWebhookPayload,
   verifyWebhookSignature,
 } = require('./whatsapp-domain');
@@ -295,6 +299,17 @@ const checkoutSchema = z.object({
   vendorReservationId: z.string().min(4).optional(),
 });
 
+const whatsappMessageSchema = z.object({
+  to: z.string().min(8),
+  type: z.enum(['text', 'template']).default('text'),
+  text: z.string().min(1).max(4096).optional(),
+  previewUrl: z.boolean().optional(),
+  replyToMessageId: z.string().min(4).optional(),
+  templateName: z.string().min(3).optional(),
+  templateLanguageCode: z.string().min(2).optional(),
+  templateParameters: z.array(z.string().min(1).max(1024)).max(20).optional(),
+});
+
 function parseCustomerMutation(documents, res) {
   const result = customerMutationSchema.safeParse(documents);
   if (!result.success) {
@@ -402,6 +417,7 @@ app.get(
 app.get('/api/whatsapp/config', (_req, res) => {
   res.json({
     whatsapp: buildWebhookConfig(),
+    messaging: buildMessagingConfig(),
   });
 });
 
@@ -450,6 +466,45 @@ app.post('/api/whatsapp/webhook', (req, res) => {
     orderReferences: event.orderReferences,
   });
 });
+
+app.post(
+  '/api/whatsapp/messages',
+  requireSession('merchant'),
+  asyncRoute(async (req, res) => {
+    const payload = parseBody(whatsappMessageSchema, req, res);
+    if (!payload) return;
+
+    let result;
+    if (payload.type === 'template') {
+      if (!payload.templateName) {
+        throw createAppError(400, 'A templateName is required when sending a WhatsApp template.');
+      }
+
+      result = await sendWhatsAppTemplateMessage({
+        to: payload.to,
+        templateName: payload.templateName,
+        languageCode: payload.templateLanguageCode || 'en_US',
+        templateParameters: payload.templateParameters || [],
+      });
+    } else {
+      if (!payload.text) {
+        throw createAppError(400, 'A text body is required when sending a WhatsApp text message.');
+      }
+
+      result = await sendWhatsAppTextMessage({
+        to: payload.to,
+        text: payload.text,
+        previewUrl: payload.previewUrl ?? false,
+        replyToMessageId: payload.replyToMessageId || '',
+      });
+    }
+
+    res.status(201).json({
+      sent: true,
+      ...result,
+    });
+  })
+);
 
 app.get(
   '/api/vendors',
@@ -644,7 +699,42 @@ app.post(
   asyncRoute(async (req, res) => {
     const payload = parseBody(checkoutSchema, req, res);
     if (!payload) return;
-    res.status(201).json(await completeCheckout(payload, payload.paymentSessionId));
+
+    const result = await completeCheckout(payload, payload.paymentSessionId);
+    let whatsappReceipt = {
+      attempted: false,
+      sent: false,
+    };
+
+    if (
+      process.env.PAYVAYLT_WHATSAPP_AUTO_RECEIPTS === 'true' &&
+      buildMessagingConfig().enabled
+    ) {
+      try {
+        const delivery = await sendWhatsAppTextMessage({
+          to: payload.registration.mobile,
+          text: buildCheckoutReceiptMessage(payload),
+        });
+
+        whatsappReceipt = {
+          attempted: true,
+          sent: true,
+          messageId: delivery.messageId,
+          recipient: delivery.recipient,
+        };
+      } catch (error) {
+        whatsappReceipt = {
+          attempted: true,
+          sent: false,
+          error: error?.message || 'WhatsApp receipt delivery failed.',
+        };
+      }
+    }
+
+    res.status(201).json({
+      ...result,
+      whatsappReceipt,
+    });
   })
 );
 

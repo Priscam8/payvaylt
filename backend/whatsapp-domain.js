@@ -1,6 +1,7 @@
 const crypto = require('crypto');
 
 const defaultVerifyToken = 'vezaqr-pay-dev-token';
+const defaultGraphApiVersion = 'v25.0';
 const webhookPath = '/api/whatsapp/webhook';
 const maxEventHistory = 25;
 
@@ -36,8 +37,16 @@ function normalizePhoneNumber(value = '') {
   return digits.length > 0 ? `+${digits}` : '';
 }
 
+function normalizeWhatsAppRecipient(value = '') {
+  return String(value).replace(/\D+/g, '');
+}
+
 function resolveVerifyToken() {
   return valueOf('PAYVAYLT_WHATSAPP_VERIFY_TOKEN') || defaultVerifyToken;
+}
+
+function resolveGraphApiVersion() {
+  return valueOf('PAYVAYLT_WHATSAPP_API_VERSION') || defaultGraphApiVersion;
 }
 
 function resolvePublicApiUrl() {
@@ -75,6 +84,27 @@ function buildWebhookConfig() {
   };
 }
 
+function buildMessagingConfig() {
+  const phoneNumberId = valueOf('PAYVAYLT_WHATSAPP_PHONE_NUMBER_ID');
+  const accessToken = valueOf('PAYVAYLT_WHATSAPP_ACCESS_TOKEN');
+  const businessAccountId = valueOf('PAYVAYLT_WHATSAPP_BUSINESS_ACCOUNT_ID');
+  const graphApiVersion = resolveGraphApiVersion();
+  const missing = [];
+
+  if (!phoneNumberId) missing.push('PAYVAYLT_WHATSAPP_PHONE_NUMBER_ID');
+  if (!accessToken) missing.push('PAYVAYLT_WHATSAPP_ACCESS_TOKEN');
+
+  return {
+    enabled: missing.length === 0,
+    graphApiVersion,
+    phoneNumberId,
+    businessAccountId,
+    endpoint: phoneNumberId ? `https://graph.facebook.com/${graphApiVersion}/${phoneNumberId}/messages` : null,
+    hasAccessToken: Boolean(accessToken),
+    missing,
+  };
+}
+
 function getRecentEvents(limit = 20) {
   return webhookState.events.slice(0, limit);
 }
@@ -92,6 +122,16 @@ function recordWebhookEvent(event) {
 
 function createWebhookEventId() {
   return `waevt-${Math.random().toString(36).slice(2, 8)}${Date.now().toString(36)}`;
+}
+
+function formatCurrency(amount) {
+  const numericAmount = Number(amount || 0);
+  const hasCents = numericAmount % 1 !== 0;
+
+  return `R ${numericAmount.toLocaleString('en-ZA', {
+    minimumFractionDigits: hasCents ? 2 : 0,
+    maximumFractionDigits: 2,
+  })}`;
 }
 
 function extractOrderReferences(text = '') {
@@ -218,11 +258,174 @@ function summarizeWebhookPayload(payload) {
   };
 }
 
+async function postWhatsAppMessage(body) {
+  const config = buildMessagingConfig();
+  if (!config.enabled || !config.endpoint) {
+    const message = config.missing.length
+      ? `WhatsApp messaging is not configured. Missing: ${config.missing.join(', ')}.`
+      : 'WhatsApp messaging is not configured.';
+    const error = new Error(message);
+    error.status = 503;
+    throw error;
+  }
+
+  const response = await fetch(config.endpoint, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${valueOf('PAYVAYLT_WHATSAPP_ACCESS_TOKEN')}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      messaging_product: 'whatsapp',
+      ...body,
+    }),
+  });
+
+  const result = await response.json().catch(() => ({}));
+
+  if (!response.ok) {
+    const detail = result?.error?.message || `Meta returned HTTP ${response.status}.`;
+    const error = new Error(`WhatsApp message send failed. ${detail}`);
+    error.status = response.status;
+    error.details = result;
+    throw error;
+  }
+
+  const acceptedMessage = Array.isArray(result?.messages) ? result.messages[0] : null;
+
+  return {
+    accepted: true,
+    messageId: acceptedMessage?.id || null,
+    recipient: String(body.to || ''),
+    provider: 'meta-whatsapp-cloud',
+    response: result,
+  };
+}
+
+async function sendWhatsAppTextMessage({ to, text, previewUrl = false, replyToMessageId = '' }) {
+  const recipient = normalizeWhatsAppRecipient(to);
+  if (!recipient) {
+    const error = new Error('A valid WhatsApp recipient number is required.');
+    error.status = 400;
+    throw error;
+  }
+
+  const body = {
+    to: recipient,
+    type: 'text',
+    text: {
+      body: String(text || '').trim(),
+      preview_url: Boolean(previewUrl),
+    },
+  };
+
+  if (!body.text.body) {
+    const error = new Error('A WhatsApp text message body is required.');
+    error.status = 400;
+    throw error;
+  }
+
+  if (replyToMessageId) {
+    body.context = {
+      message_id: String(replyToMessageId),
+    };
+  }
+
+  return postWhatsAppMessage(body);
+}
+
+async function sendWhatsAppTemplateMessage({
+  to,
+  templateName,
+  languageCode = 'en_US',
+  templateParameters = [],
+}) {
+  const recipient = normalizeWhatsAppRecipient(to);
+  if (!recipient) {
+    const error = new Error('A valid WhatsApp recipient number is required.');
+    error.status = 400;
+    throw error;
+  }
+
+  const name = String(templateName || '').trim();
+  if (!name) {
+    const error = new Error('A WhatsApp template name is required.');
+    error.status = 400;
+    throw error;
+  }
+
+  const body = {
+    to: recipient,
+    type: 'template',
+    template: {
+      name,
+      language: {
+        code: String(languageCode || 'en_US').trim() || 'en_US',
+      },
+    },
+  };
+
+  if (templateParameters.length > 0) {
+    body.template.components = [
+      {
+        type: 'body',
+        parameters: templateParameters.map((value) => ({
+          type: 'text',
+          text: String(value),
+        })),
+      },
+    ];
+  }
+
+  return postWhatsAppMessage(body);
+}
+
+function buildCheckoutReceiptMessage(payload) {
+  const deposit = Number(payload?.plan?.deposit || 0);
+  const voucherAmount = Number(payload?.plan?.voucherAmount || 0);
+  const total = Number(payload?.journey?.cartTotal || 0);
+  const finalPayment = Math.max(Number((total - deposit - voucherAmount).toFixed(2)), 0);
+  const itemCount = Number(payload?.journey?.itemCount || 0);
+
+  const lines = [
+    'VezaQR Pay payment confirmed',
+    '',
+    `Store: ${String(payload?.journey?.store || '')}`,
+    `Item: ${String(payload?.journey?.leadItem || '')}`,
+    `Quantity: ${itemCount}`,
+    `Cart ID: ${String(payload?.journey?.cartId || '')}`,
+    `Reference: ${String(payload?.releaseReference || '')}`,
+    `Total paid: ${formatCurrency(total)}`,
+  ];
+
+  if (deposit > 0) {
+    lines.push(`Deposit: ${formatCurrency(deposit)}`);
+  }
+
+  if (voucherAmount > 0) {
+    lines.push(`Voucher applied: ${formatCurrency(voucherAmount)}`);
+  }
+
+  if (finalPayment > 0) {
+    lines.push(`Final payment: ${formatCurrency(finalPayment)}`);
+  }
+
+  lines.push(`Release: ${String(payload?.journey?.releaseLeadTime || '')}`);
+  lines.push('');
+  lines.push('Your order is now release-ready.');
+
+  return lines.join('\n');
+}
+
 module.exports = {
   buildWebhookConfig,
+  buildMessagingConfig,
+  buildCheckoutReceiptMessage,
   getRecentEvents,
   recordWebhookEvent,
   recordWebhookVerification,
+  sendWhatsAppTemplateMessage,
+  sendWhatsAppTextMessage,
   summarizeWebhookPayload,
   verifyWebhookSignature,
 };

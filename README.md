@@ -140,7 +140,8 @@ PayVaylt ships with a ready-to-edit [`.env.example`](./.env.example). Copy it to
 - `PAYVAYLT_PAYMENT_PROVIDER` supports `mock` for local development and `stripe` for hosted checkout.
 - `PAYVAYLT_STRIPE_SUCCESS_URL` and `PAYVAYLT_STRIPE_CANCEL_URL` are optional overrides. If they are blank, PayVaylt derives them from `PAYVAYLT_PUBLIC_APP_URL`.
 - `PAYVAYLT_ALLOW_DEV_CODES=true` keeps the OTP code visible in development responses when using the console provider.
-- `PAYVAYLT_WHATSAPP_VERIFY_TOKEN`, `PAYVAYLT_WHATSAPP_APP_SECRET`, and `PAYVAYLT_WHATSAPP_ACCESS_TOKEN` prepare the backend for Meta WhatsApp Cloud API webhooks.
+- `PAYVAYLT_WHATSAPP_VERIFY_TOKEN`, `PAYVAYLT_WHATSAPP_APP_SECRET`, `PAYVAYLT_WHATSAPP_PHONE_NUMBER_ID`, and `PAYVAYLT_WHATSAPP_ACCESS_TOKEN` prepare the backend for Meta WhatsApp Cloud API webhooks and outbound messaging.
+- `PAYVAYLT_WHATSAPP_AUTO_RECEIPTS=true` lets `/api/checkout/complete` send a WhatsApp payment confirmation after a successful checkout when Cloud API messaging is configured.
 
 Before deploying, run:
 
@@ -159,6 +160,7 @@ The backend now exposes the Meta webhook routes needed to start wiring PayVaylt 
 - `GET /api/whatsapp/events`
 - `GET /api/whatsapp/webhook`
 - `POST /api/whatsapp/webhook`
+- `POST /api/whatsapp/messages`
 
 `GET /api/whatsapp/config` returns the callback URL and verify-token values that belong in the Meta developer form once `PAYVAYLT_PUBLIC_API_URL` points to a live backend.
 
@@ -183,6 +185,7 @@ Meta cannot verify a localhost callback, so you still need a deployed public bac
 - `GET /api/whatsapp/events`
 - `GET /api/whatsapp/webhook`
 - `POST /api/whatsapp/webhook`
+- `POST /api/whatsapp/messages`
 - `GET /api/vendors`
 - `GET /api/vendors/:vendorSlug/catalog`
 - `POST /api/vendors/:vendorSlug/reservations`
