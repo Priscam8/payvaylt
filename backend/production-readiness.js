@@ -29,6 +29,15 @@ function resolvePublicAppUrl() {
   return trimTrailingSlash(valueOf('PAYVAYLT_PUBLIC_APP_URL'));
 }
 
+function resolvePublicApiUrl() {
+  const explicit = trimTrailingSlash(valueOf('PAYVAYLT_PUBLIC_API_URL'));
+  if (explicit) {
+    return explicit;
+  }
+
+  return trimTrailingSlash(valueOf('EXPO_PUBLIC_PAYVAYLT_API_URL'));
+}
+
 function resolveStripeRedirectUrl(kind) {
   const key = kind === 'cancel' ? 'PAYVAYLT_STRIPE_CANCEL_URL' : 'PAYVAYLT_STRIPE_SUCCESS_URL';
   const explicit = trimTrailingSlash(valueOf(key));
@@ -69,6 +78,7 @@ function getLaunchReadiness() {
     valueOf('PAYVAYLT_PAYMENT_PROVIDER') ||
     (hasValue('PAYVAYLT_STRIPE_SECRET_KEY') ? 'stripe' : 'mock');
   const mobileApiUrl = valueOf('EXPO_PUBLIC_PAYVAYLT_API_URL');
+  const publicApiUrl = resolvePublicApiUrl();
 
   const checks = {};
 
@@ -213,6 +223,34 @@ function getLaunchReadiness() {
     });
   }
 
+  const webhookMissing = [];
+  if (!valueOf('PAYVAYLT_WHATSAPP_VERIFY_TOKEN')) webhookMissing.push('PAYVAYLT_WHATSAPP_VERIFY_TOKEN');
+  if (!valueOf('PAYVAYLT_WHATSAPP_APP_SECRET')) webhookMissing.push('PAYVAYLT_WHATSAPP_APP_SECRET');
+  if (!valueOf('PAYVAYLT_WHATSAPP_ACCESS_TOKEN')) webhookMissing.push('PAYVAYLT_WHATSAPP_ACCESS_TOKEN');
+
+  if (!publicApiUrl) {
+    warnings.push(
+      'WhatsApp: set PAYVAYLT_PUBLIC_API_URL to the deployed backend /api URL before verifying the Meta webhook.'
+    );
+    checks.whatsapp = createCheck('warn', 'The public API URL for Meta webhook verification is not configured.');
+  } else if (isExampleUrlValue(publicApiUrl) || isLocalUrlValue(publicApiUrl)) {
+    warnings.push('WhatsApp: PAYVAYLT_PUBLIC_API_URL still points to localhost or a placeholder.');
+    checks.whatsapp = createCheck('warn', 'The public API URL is still pointing at a placeholder.', {
+      url: publicApiUrl,
+      missing: webhookMissing,
+    });
+  } else if (webhookMissing.length > 0) {
+    warnings.push(`WhatsApp: missing ${webhookMissing.join(', ')} for Cloud API verification.`);
+    checks.whatsapp = createCheck('warn', 'WhatsApp webhook support is incomplete for production verification.', {
+      url: publicApiUrl,
+      missing: webhookMissing,
+    });
+  } else {
+    checks.whatsapp = createCheck('pass', 'WhatsApp webhook configuration values are present.', {
+      url: publicApiUrl,
+    });
+  }
+
   return {
     ready: failures.length === 0,
     failures,
@@ -223,6 +261,9 @@ function getLaunchReadiness() {
       successUrl: successUrl || null,
       cancelUrl: cancelUrl || null,
     },
+    apiUrls: {
+      publicApiUrl: publicApiUrl || null,
+    },
   };
 }
 
@@ -232,6 +273,7 @@ module.exports = {
   isExampleUrlValue,
   isLocalUrlValue,
   resolvePublicAppUrl,
+  resolvePublicApiUrl,
   resolveStripeRedirectUrl,
   valueOf,
 };

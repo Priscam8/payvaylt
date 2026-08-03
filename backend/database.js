@@ -108,6 +108,8 @@ async function runMigrations() {
   const files = fs
     .readdirSync(migrationsDir)
     .filter((file) => file.endsWith('.sql'))
+    .filter((file) => !file.startsWith('._'))
+    .filter((file) => !file.startsWith('.'))
     .sort();
 
   await withTransaction(async (client) => {
